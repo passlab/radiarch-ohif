@@ -1,0 +1,14 @@
+{
+  "name": "@radiarch/rt-dose-core",
+  "version": "0.1.0",
+  "description": "RT Dose for web viewers: the dose volume from a DICOM RT Dose, its resampling onto an image grid, the DVHs it carries, isodose levels. No dependencies. Research use only.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "src/index.js",
+  "module": "src/index.js",
+  "exports": { ".": "./src/index.js" },
+  "files": ["src/**", "README.md"],
+  "engines": { "node": ">=20" },
+  "scripts": { "test": "node --test test/core.test.js" },
+  "keywords": ["dicom", "rtdose", "dvh", "ohif", "radiotherapy"]
+}

@@ -1,0 +1,36 @@
+{
+  "name": "@radiarch/ohif-extension-rt-dose",
+  "version": "0.1.0",
+  "description": "OHIF extension: DICOM RT Dose as a colour wash over the CT, isodose levels of the prescription, and the DVHs the dose carries. Research use only; not for clinical use.",
+  "author": "The Radiarch Project",
+  "license": "Apache-2.0",
+  "repository": "passlab/radiarch",
+  "main": "src/index.tsx",
+  "module": "src/index.tsx",
+  "engines": {
+    "node": ">=24"
+  },
+  "files": [
+    "src/**",
+    "README.md"
+  ],
+  "peerDependencies": {
+    "@ohif/core": "workspace:*",
+    "@ohif/extension-cornerstone": "workspace:*",
+    "@ohif/extension-default": "workspace:*",
+    "@ohif/i18n": "workspace:*",
+    "@ohif/ui-next": "workspace:*",
+    "prop-types": "15.8.1",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "dependencies": {
+    "@babel/runtime": "7.29.7",
+    "@cornerstonejs/core": "5.6.8",
+    "@radiarch/rt-dose-core": "workspace:*",
+    "dcmjs": "0.52.0"
+  },
+  "keywords": [
+    "ohif-extension"
+  ]
+}
