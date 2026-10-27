@@ -1,0 +1,30 @@
+{
+  "name": "@radiarch/ohif-extension-radiarch",
+  "version": "0.1.0",
+  "description": "OHIF extension: the radiarch plan behind the dose on screen (layer two of ADR 0018): plan summary, clinical goals graded by radiarch, radiarch's DVHs. Needs a radiarch API. Research use only; not for clinical use.",
+  "author": "The Radiarch Project",
+  "license": "Apache-2.0",
+  "repository": "passlab/radiarch",
+  "main": "src/index.tsx",
+  "module": "src/index.tsx",
+  "engines": {
+    "node": ">=24"
+  },
+  "files": [
+    "src/**"
+  ],
+  "peerDependencies": {
+    "@ohif/core": "workspace:*",
+    "@ohif/ui-next": "workspace:*",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "dependencies": {
+    "@babel/runtime": "7.29.7",
+    "@radiarch/client": "workspace:*",
+    "@radiarch/ohif-extension-rt-dose": "workspace:*"
+  },
+  "keywords": [
+    "ohif-extension"
+  ]
+}

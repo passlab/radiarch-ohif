@@ -1,0 +1,14 @@
+{
+  "name": "@radiarch/client",
+  "version": "0.1.0",
+  "description": "The radiarch REST API for web viewers: the export behind a DICOM object, goal templates, evaluations, the plan summary. No dependencies (fetch). Research use only.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "src/index.js",
+  "module": "src/index.js",
+  "exports": { ".": "./src/index.js" },
+  "files": ["src/**"],
+  "engines": { "node": ">=20" },
+  "scripts": { "test": "node --test test/client.test.js" },
+  "keywords": ["radiotherapy", "radiarch", "ohif"]
+}

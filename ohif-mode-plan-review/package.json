@@ -1,0 +1,29 @@
+{
+  "name": "@radiarch/mode-plan-review",
+  "version": "0.1.0",
+  "description": "OHIF mode: review a radiotherapy plan, the dose over its CT with the structures, the DVHs and, with a radiarch API, the plan and its clinical goals (layer three of ADR 0018). Research use only; not for clinical use.",
+  "author": "The Radiarch Project",
+  "license": "Apache-2.0",
+  "repository": "passlab/radiarch",
+  "main": "src/index.tsx",
+  "module": "src/index.tsx",
+  "engines": {
+    "node": ">=24"
+  },
+  "files": [
+    "src/**"
+  ],
+  "peerDependencies": {
+    "@ohif/core": "workspace:*",
+    "@ohif/mode-basic": "workspace:*"
+  },
+  "dependencies": {
+    "@babel/runtime": "7.29.7",
+    "@radiarch/ohif-extension-radiarch": "workspace:*",
+    "@radiarch/ohif-extension-rt-dose": "workspace:*",
+    "immutability-helper": "3.1.1"
+  },
+  "keywords": [
+    "ohif-mode"
+  ]
+}

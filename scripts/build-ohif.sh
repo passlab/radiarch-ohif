@@ -16,19 +16,25 @@ if [ ! -d "$OHIF/.git" ]; then
   git clone --quiet --depth 1 --branch "$OHIF_VERSION" https://github.com/OHIF/Viewers.git "$OHIF"
 fi
 
-# radiarch's packages join OHIF's pnpm workspace (extensions/*)
-rm -rf "$OHIF/extensions/radiarch-rt-dose-core" "$OHIF/extensions/radiarch-ohif-extension-rt-dose"
-cp -r "$VIEWER/rt-dose-core" "$OHIF/extensions/radiarch-rt-dose-core"
-cp -r "$VIEWER/ohif-extension-rt-dose" "$OHIF/extensions/radiarch-ohif-extension-rt-dose"
+# radiarch's packages join OHIF's pnpm workspace: libraries and extensions under extensions/, the mode under modes/
+for pkg in rt-dose-core radiarch-client ohif-extension-rt-dose ohif-extension-radiarch; do
+  rm -rf "$OHIF/extensions/radiarch-$pkg"
+  cp -r "$VIEWER/$pkg" "$OHIF/extensions/radiarch-$pkg"
+done
+rm -rf "$OHIF/modes/radiarch-plan-review"
+cp -r "$VIEWER/ohif-mode-plan-review" "$OHIF/modes/radiarch-plan-review"
 
-# registered with the app; not a default extension, a mode asks for it
+# registered with the app: the extensions are not default ones (the mode asks for them); the mode is listed
 python3 - "$OHIF/platform/app/pluginConfig.json" <<'PY'
 import json, sys
 p = sys.argv[1]
 cfg = json.load(open(p))
-names = {e["packageName"] for e in cfg["extensions"]}
-if "@radiarch/ohif-extension-rt-dose" not in names:
-    cfg["extensions"].append({"packageName": "@radiarch/ohif-extension-rt-dose", "default": False, "version": "0.1.0"})
+have = {e["packageName"] for e in cfg["extensions"]}
+for name in ("@radiarch/ohif-extension-rt-dose", "@radiarch/ohif-extension-radiarch"):
+    if name not in have:
+        cfg["extensions"].append({"packageName": name, "default": False, "version": "0.1.0"})
+if "@radiarch/mode-plan-review" not in {m["packageName"] for m in cfg["modes"]}:
+    cfg["modes"].append({"packageName": "@radiarch/mode-plan-review"})
 json.dump(cfg, open(p, "w"), indent=2)
 PY
 

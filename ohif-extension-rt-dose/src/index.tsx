@@ -2,13 +2,15 @@
 // any system's RT Dose is shown over its CT, with the DVHs the dose carries. Research use only; not for clinical use.
 //
 // A mode uses it by adding `${id}.sopClassHandlerModule.rt-dose` to its SOP class handlers, the viewport
-// `${id}.viewportModule.rt-dose` for that handler, and optionally the panel `${id}.panelModule.rt-dose-dvh`.
+// `${id}.viewportModule.rt-dose` for that handler, and optionally the panel `${id}.panelModule.rt-dose-dvh` and the
+// hanging protocol 'radiarch-rt-dose' (the plan dose over its CT).
 
 import React from 'react';
 import { utilities as csUtils } from '@cornerstonejs/core';
 
 import { id, COLORMAP_NAME, ViewportName, PanelName, SOPClassHandlerId } from './id';
 import getSopClassHandlerModule from './getSopClassHandlerModule';
+import getHangingProtocolModule from './getHangingProtocolModule';
 import PanelRTDoseDVH from './panels/PanelRTDoseDVH';
 import { isodoseColormap } from './viewports/OHIFCornerstoneRTDoseViewport';
 
@@ -53,7 +55,10 @@ const extension = {
   },
 
   getSopClassHandlerModule,
+  getHangingProtocolModule,
 };
 
 export { SOPClassHandlerId };
 export default extension;
+export { DVHChart } from './panels/PanelRTDoseDVH';
+export { onDoseLoaded } from './events';
