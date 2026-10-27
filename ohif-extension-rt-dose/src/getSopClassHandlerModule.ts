@@ -46,6 +46,20 @@ function structureSetOfFrame(StudyInstanceUID: string, FrameOfReferenceUID: stri
   return null;
 }
 
+/** Patient coordinates (mm) of the dose maximum on the CT grid, where the viewport opens. */
+function hottestPoint(values: Float32Array, ct) {
+  let at = 0;
+  for (let i = 1; i < values.length; i++) {
+    if (values[i] > values[at]) {
+      at = i;
+    }
+  }
+  const [nx, ny] = ct.dimensions;
+  const ijk = [at % nx, Math.floor(at / nx) % ny, Math.floor(at / (nx * ny))];
+  const d = ct.direction;
+  return [0, 1, 2].map(a => ct.origin[a] + ijk[0] * ct.spacing[0] * d[a] + ijk[1] * ct.spacing[1] * d[3 + a] + ijk[2] * ct.spacing[2] * d[6 + a]);
+}
+
 function firstItem(seq) {
   return Array.isArray(seq) ? seq[0] : seq;
 }
@@ -196,6 +210,7 @@ async function _loadDose(displaySet, headers) {
 
   const onCt = resampleToGrid(dose, { dimensions: ct.dimensions, spacing: ct.spacing, origin: ct.origin, direction: ct.direction });
   const percent = relativeDose(onCt, displaySet.reference.gy);
+  displaySet.hotspotWorld = hottestPoint(percent, ct);
   const derived = await volumeLoader.createAndCacheDerivedVolume(referencedVolumeId, {
     volumeId: displaySet.displaySetInstanceUID,
     targetBuffer: { type: 'Float32Array' },

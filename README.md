@@ -50,7 +50,7 @@ push (the job "Viewer") and checks that both extensions and the mode are in the 
 3. **Units.** It is drawn in % of the plan's target prescription dose, found by the RT Plan the dose
    references. Without a stated prescription, the dose maximum is the 100 % level.
 4. **Colours.** Isodose bands at 107, 100, 95, 90, 80, 70, 50 and 30 % are drawn over the CT. Below
-   30 % the dose is transparent.
+   30 % the dose is transparent. The viewport opens on the slice through the dose maximum.
 5. **Opacity.** Cornerstone's ray caster scales opacity by the sample distance over the opacity unit
    distance, 1 mm by default. Through a 0.05 mm MPR slab, the bands' 0.45 per mm came to almost
    nothing, so the first hand check saw no colour wash. The dose actor's unit distance is now 0.15 mm,

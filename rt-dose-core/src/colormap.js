@@ -3,10 +3,11 @@
 
 export const DEFAULT_ISODOSE_PERCENTS = [107, 100, 95, 90, 80, 70, 50, 30];
 
-// From cold to hot, one colour per level from the lowest up (RGB 0–1)
+// From cold to hot, one colour per level from the lowest up (RGB 0–1). The low bands are light enough to show over air
+// and lung, which are black in a CT window.
 const PALETTE = [
-  [0.0, 0.0, 1.0],
-  [0.0, 0.6, 1.0],
+  [0.35, 0.5, 1.0],
+  [0.0, 0.8, 1.0],
   [0.0, 0.8, 0.4],
   [0.6, 0.9, 0.0],
   [1.0, 0.9, 0.0],

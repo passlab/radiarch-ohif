@@ -3,7 +3,7 @@
 // isodose colormap and a window fixed in %.
 
 import PropTypes from 'prop-types';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { OHIFCornerstoneViewport } from '@ohif/extension-cornerstone';
 
 import { doseColormap, isodoseLevels } from '@radiarch/rt-dose-core';
@@ -47,7 +47,9 @@ function OHIFCornerstoneRTDoseViewport(props: withAppTypes) {
   );
 
   // once Cornerstone has mounted the volumes (and after any remount), give the dose its opacity per slice; marking
-  // the opacity function modified rebuilds the opacity texture, which is cached by that function's time stamp
+  // the opacity function modified rebuilds the opacity texture, which is cached by that function's time stamp. The
+  // first time, move to the slice through the dose maximum: the middle slice may hold little or no dose.
+  const opened = useRef(false);
   useEffect(() => {
     const viewportId = viewportOptions.viewportId;
     const apply = () => {
@@ -60,6 +62,15 @@ function OHIFCornerstoneRTDoseViewport(props: withAppTypes) {
       if (property.getScalarOpacityUnitDistance(0) !== OPACITY_UNIT_DISTANCE_MM) {
         property.setScalarOpacityUnitDistance(0, OPACITY_UNIT_DISTANCE_MM);
         property.getScalarOpacity(0)?.modified();
+        viewport.render();
+      }
+      const hot = doseDisplaySet.hotspotWorld;
+      if (hot && !opened.current) {
+        opened.current = true;
+        const { focalPoint, position, viewPlaneNormal } = viewport.getCamera();
+        const shift = [0, 1, 2].reduce((s, a) => s + (hot[a] - focalPoint[a]) * viewPlaneNormal[a], 0);
+        const move = p => p.map((v, a) => v + shift * viewPlaneNormal[a]);
+        viewport.setCamera({ focalPoint: move(focalPoint), position: move(position) });
         viewport.render();
       }
     };
