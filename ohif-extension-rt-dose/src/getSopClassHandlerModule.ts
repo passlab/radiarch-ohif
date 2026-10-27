@@ -33,6 +33,17 @@ function findInstance(StudyInstanceUID: string, SOPInstanceUID: string) {
   return null;
 }
 
+/** The image series the dose's structure set (directly, or through its plan) refers to, from OHIF's metadata. */
+function referencedImageSeries(StudyInstanceUID: string, rtdose) {
+  const planUid = firstItem(rtdose?.ReferencedRTPlanSequence)?.ReferencedSOPInstanceUID;
+  const plan = planUid ? findInstance(StudyInstanceUID, planUid) : null;
+  const structUid = firstItem(rtdose?.ReferencedStructureSetSequence)?.ReferencedSOPInstanceUID
+    ?? firstItem(plan?.ReferencedStructureSetSequence)?.ReferencedSOPInstanceUID;
+  const struct = structUid ? findInstance(StudyInstanceUID, structUid) : null;
+  const study = firstItem(firstItem(struct?.ReferencedFrameOfReferenceSequence)?.RTReferencedStudySequence);
+  return firstItem(study?.RTReferencedSeriesSequence)?.SeriesInstanceUID ?? null;
+}
+
 function structureSetOfFrame(StudyInstanceUID: string, FrameOfReferenceUID: string) {
   const study = DicomMetadataStore.getStudy(StudyInstanceUID);
   for (const series of study?.series ?? []) {
@@ -115,18 +126,23 @@ function _getDisplaySetsFromSeries(instances, servicesManager: AppTypes.Services
       reference: null,
     } as any;
 
-    // the image display set of the same frame of reference (a CT, preferably), found when first needed: at creation
-    // the other display sets may not exist yet
+    // the image display set the dose lies on, found when first needed (at creation the others may not exist yet):
+    // one of the same frame of reference (a CT, preferably); else the image series the dose's structure set refers to
+    // (some CTs carry no Frame of Reference UID); else the study's only CT
     displaySet.getReferenceDisplaySet = () => {
       const { displaySetService } = servicesManager.services;
       if (displaySet.referencedDisplaySetInstanceUID) {
         return displaySetService.getDisplaySetByUID(displaySet.referencedDisplaySetInstanceUID);
       }
-      const candidates = displaySetService
+      const images = displaySetService
         .getActiveDisplaySets()
-        .filter(ds => ds.isReconstructable && !ds.isDerivedDisplaySet && ds.StudyInstanceUID === StudyInstanceUID
-          && frameOfReference(ds) === displaySet.FrameOfReferenceUID);
-      const ref = candidates.find(ds => ds.Modality === 'CT') ?? candidates[0];
+        .filter(ds => ds.isReconstructable && !ds.isDerivedDisplaySet && ds.StudyInstanceUID === StudyInstanceUID);
+      const sameFrame = images.filter(ds => frameOfReference(ds) && frameOfReference(ds) === displaySet.FrameOfReferenceUID);
+      const seriesUid = referencedImageSeries(StudyInstanceUID, instance);
+      const cts = images.filter(ds => ds.Modality === 'CT');
+      const ref = sameFrame.find(ds => ds.Modality === 'CT') ?? sameFrame[0]
+        ?? images.find(ds => seriesUid && ds.SeriesInstanceUID === seriesUid)
+        ?? (cts.length === 1 ? cts[0] : undefined);
       if (!ref) {
         throw new Error('RT Dose: no image series of the same frame of reference in the study');
       }
