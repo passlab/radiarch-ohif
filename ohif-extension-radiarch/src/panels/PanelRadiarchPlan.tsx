@@ -144,18 +144,24 @@ function PanelRadiarchPlan({ servicesManager }: withAppTypes) {
                 {evaluation.goals.all_priority1_passed ? '' : ' (a priority-1 goal is not met)'}
               </div>
               <table className="w-full table-fixed text-xs">
-                <thead>
-                  <tr><th className="text-left">P</th><th className="text-left">Structure</th><th className="text-left">Goal</th><th className="text-right">Achieved</th><th /></tr>
-                </thead>
+                <colgroup>
+                  <col className="w-6" />
+                  <col />
+                  <col className="w-20" />
+                </colgroup>
                 <tbody>
                   {rows.map((r, i) => (
-                    <tr key={i}>
-                      <td>{r.priority}</td>
-                      <td>{r.structure}</td>
-                      <td>{r.goal}</td>
-                      <td className="text-right">{fmt(r.achieved)}</td>
-                      <td className={r.passed === null ? 'text-gray-400' : r.passed ? 'text-green-400' : 'text-red-400'}>
-                        {r.passed === null ? 'missing' : r.passed ? 'met' : 'not met'}
+                    <tr key={i} className="border-b border-gray-800 align-top">
+                      <td className="py-0.5 text-gray-400">P{r.priority}</td>
+                      <td className="py-0.5">
+                        <div>{r.structure}</div>
+                        <div className="text-gray-400">{r.goal}</div>
+                      </td>
+                      <td className="py-0.5 text-right">
+                        <div>{fmt(r.achieved)}</div>
+                        <div className={r.passed === null ? 'text-gray-400' : r.passed ? 'text-green-400' : 'text-red-400'}>
+                          {r.passed === null ? 'missing' : r.passed ? 'met' : 'not met'}
+                        </div>
                       </td>
                     </tr>
                   ))}

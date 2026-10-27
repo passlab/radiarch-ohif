@@ -51,7 +51,13 @@ push (the job "Viewer") and checks that both extensions and the mode are in the 
    references. Without a stated prescription, the dose maximum is the 100 % level.
 4. **Colours.** Isodose bands at 107, 100, 95, 90, 80, 70, 50 and 30 % are drawn over the CT. Below
    30 % the dose is transparent.
-5. **DVHs.** The DVH panel shows the curves stored in the RT Dose, named and coloured by the structure
+5. **Opacity.** Cornerstone's ray caster scales opacity by the sample distance over the opacity unit
+   distance, 1 mm by default. Through a 0.05 mm MPR slab, the bands' 0.45 per mm came to almost
+   nothing, so the first hand check saw no colour wash. The dose actor's unit distance is now 0.15 mm,
+   chosen by eye on a lung plan: the bands are clear and the CT shows through. It is set when OHIF
+   mounts the volumes, and the opacity function is marked modified, because Cornerstone caches the
+   opacity texture by that function's time stamp.
+6. **DVHs.** The DVH panel shows the curves stored in the RT Dose, named and coloured by the structure
    set the dose references. For a radiarch export these are radiarch's own DVHs, computed on its grid.
 
 OHIF 3.13.13 draws a derived overlay volume only for display sets of its pseudo-modality `PMAP`, so a

@@ -74,7 +74,11 @@ function PanelRTDoseDVH({ servicesManager }: withAppTypes) {
       {dose.dvhs.length ? (
         <>
           <DVHChart curves={dose.dvhs} />
-          <div className="text-xs text-gray-300">DVHs from the RT Dose file (computed by the system that wrote it).</div>
+          <div className="text-xs text-gray-300">
+            {dose.dvhs[0].source === 'file'
+              ? 'DVHs from the RT Dose file (computed by the system that wrote it).'
+              : 'DVHs computed in the browser from the structure set; they can differ from the planning system\'s at structure edges.'}
+          </div>
           <table className="text-xs">
             <thead>
               <tr><th className="text-left">Structure</th><th>Min</th><th>Mean</th><th>Max (Gy)</th></tr>

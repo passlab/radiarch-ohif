@@ -18,6 +18,9 @@ import {
   doseColormap,
   referenceDose,
   relativeDose,
+  computeDVHs,
+  structureMasks,
+  dvhBinWidth,
 } from '../src/index.js';
 
 const DIR = process.env.RT_DOSE_FIXTURES;
@@ -173,4 +176,47 @@ test('the 100 % isodose is the prescription when the plan states one, else the m
   assert.deepEqual(referenceDose(null, 12), { gy: 12, source: 'maximum' });
   assert.deepEqual(Array.from(relativeDose(new Float32Array([0, 30, 66]), 60)), [0, 50, 110]);
   assert.equal(relativeDose(new Float32Array([5]), 0)[0], 0);
+});
+
+test('DVHs computed in the browser from the structure set reproduce the ones radiarch wrote', { skip }, () => {
+  for (const c of fixtures.dvhs) {
+    const rd = dataset(c.rtdose);
+    const rs = dataset(c.rtstruct);
+    const dose = readDose(rd);
+    const rois = roiInfo(rs);
+    const computed = computeDVHs(dose, structureMasks(rs, dose.geometry), rois);
+    const written = readDVHs(rd, rois);
+    assert.deepEqual(computed.map(x => x.name), written.map(x => x.name));
+    computed.forEach((got, i) => {
+      const want = written[i];
+      assert.equal(got.source, 'computed in the browser');
+      // the same voxels: the same volume at 0 Gy, and the same curve bin for bin
+      assert.ok(Math.abs(got.volume[0] - want.volume[0]) <= 1e-6 * want.volume[0], `${got.name}: ${got.volume[0]} vs ${want.volume[0]} cm3`);
+      assert.equal(got.doseGy.length, want.doseGy.length, got.name);
+      assert.ok(maxAbsDiff(got.volume, want.volume) <= 1e-6 * want.volume[0], got.name);
+      assert.ok(Math.abs(got.meanGy - want.meanGy) <= 1e-4 * want.meanGy && Math.abs(got.maxGy - want.maxGy) <= 1e-4 * want.maxGy, got.name);
+    });
+  }
+});
+
+test('the DVH bin width is radiarch\'s', () => {
+  assert.deepEqual([0, 5, 20, 60, 74, 300].map(dvhBinWidth), [0.01, 0.01, 0.05, 0.1, 0.1, 0.5]);
+});
+
+test('a contour inside another is a hole', () => {
+  const g = doseGeometry({
+    ImageOrientationPatient: [1, 0, 0, 0, 1, 0], ImagePositionPatient: [0, 0, 0], PixelSpacing: [1, 1],
+    Rows: 10, Columns: 10, NumberOfFrames: 1, GridFrameOffsetVector: [0],
+  });
+  const square = (a, b) => [a, a, 0, b, a, 0, b, b, 0, a, b, 0];
+  const masks = structureMasks({ ROIContourSequence: [{ ReferencedROINumber: 1, ContourSequence: [
+    { ContourGeometricType: 'CLOSED_PLANAR', ContourData: square(0.5, 8.5) },
+    { ContourGeometricType: 'CLOSED_PLANAR', ContourData: square(2.5, 6.5) },
+  ] }] }, g);
+  const m = masks.get(1);
+  const inside = (i, j) => m[j * 10 + i];
+  assert.equal(inside(1, 1), 1);       // in the outer ring
+  assert.equal(inside(4, 4), 0);       // in the hole
+  assert.equal(inside(9, 9), 0);       // outside
+  assert.equal(m.reduce((s, v) => s + v, 0), 8 * 8 - 4 * 4);
 });

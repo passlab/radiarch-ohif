@@ -13,6 +13,11 @@ import { onDoseLoaded } from '../events';
 export const ISODOSE_PERCENTS = [107, 100, 95, 90, 80, 70, 50, 30];
 export const WINDOW_PERCENT = 120;
 export const DOSE_OPACITY = 0.45;
+// The ray caster scales a volume's opacity by (sample distance / opacity unit distance, 1 mm by default). Through an
+// MPR slice, which is Cornerstone's 0.05 mm slab, an opacity of 0.45 per mm comes to about 0.03, so the dose was
+// almost invisible over the CT. At 0.15 mm the bands are clearly coloured and the CT shows through (0.05 hides it,
+// 0.3 darkens the colours); chosen by eye on a lung plan.
+export const OPACITY_UNIT_DISTANCE_MM = 0.15;
 
 /** The isodose colormap in %, registered once with Cornerstone (index.tsx) and used by every dose viewport. */
 export function isodoseColormap() {
@@ -21,7 +26,7 @@ export function isodoseColormap() {
 
 function OHIFCornerstoneRTDoseViewport(props: withAppTypes) {
   const { displaySets, children, viewportOptions, displaySetOptions, servicesManager } = props;
-  const { customizationService } = servicesManager.services;
+  const { customizationService, cornerstoneViewportService } = servicesManager.services;
 
   if (displaySets.length !== 1) {
     throw new Error('The RT Dose viewport takes one dose display set');
@@ -40,6 +45,31 @@ function OHIFCornerstoneRTDoseViewport(props: withAppTypes) {
       }),
     [doseDisplaySet]
   );
+
+  // once Cornerstone has mounted the volumes (and after any remount), give the dose its opacity per slice; marking
+  // the opacity function modified rebuilds the opacity texture, which is cached by that function's time stamp
+  useEffect(() => {
+    const viewportId = viewportOptions.viewportId;
+    const apply = () => {
+      const viewport = cornerstoneViewportService.getCornerstoneViewport(viewportId);
+      const dose = viewport?.getActors?.().find(a => String(a.referencedId).endsWith(doseDisplaySet.displaySetInstanceUID));
+      if (!dose) {
+        return;
+      }
+      const property = dose.actor.getProperty();
+      if (property.getScalarOpacityUnitDistance(0) !== OPACITY_UNIT_DISTANCE_MM) {
+        property.setScalarOpacityUnitDistance(0, OPACITY_UNIT_DISTANCE_MM);
+        property.getScalarOpacity(0)?.modified();
+        viewport.render();
+      }
+    };
+    const { unsubscribe } = cornerstoneViewportService.subscribe(
+      cornerstoneViewportService.EVENTS.VIEWPORT_VOLUMES_CHANGED,
+      ({ viewportInfo }) => (viewportInfo?.viewportId ?? viewportInfo?.getViewportId?.()) === viewportId && apply()
+    );
+    apply();
+    return unsubscribe;
+  }, [cornerstoneViewportService, viewportOptions.viewportId, doseDisplaySet, loading]);
 
   const getCornerstoneViewport = useCallback(() => {
     const cmap = isodoseColormap();

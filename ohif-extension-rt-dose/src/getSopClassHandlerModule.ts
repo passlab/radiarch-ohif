@@ -11,7 +11,7 @@ import { utils, DicomMetadataStore, Types as OhifTypes } from '@ohif/core';
 import { cache, utilities as csUtils, volumeLoader } from '@cornerstonejs/core';
 import { dicomLoaderService, VOLUME_LOADER_SCHEME } from '@ohif/extension-cornerstone';
 import dcmjs from 'dcmjs';
-import { readDose, readDVHs, roiInfo, referenceDose, relativeDose, resampleToGrid } from '@radiarch/rt-dose-core';
+import { readDose, readDVHs, roiInfo, referenceDose, relativeDose, resampleToGrid, computeDVHs, structureMasks } from '@radiarch/rt-dose-core';
 
 import { SOPClassHandlerId } from './id';
 import { emitDoseLoaded } from './events';
@@ -33,8 +33,34 @@ function findInstance(StudyInstanceUID: string, SOPInstanceUID: string) {
   return null;
 }
 
+function structureSetOfFrame(StudyInstanceUID: string, FrameOfReferenceUID: string) {
+  const study = DicomMetadataStore.getStudy(StudyInstanceUID);
+  for (const series of study?.series ?? []) {
+    const found = series.instances?.find(
+      i => i.Modality === 'RTSTRUCT' && firstItem(i.ReferencedFrameOfReferenceSequence)?.FrameOfReferenceUID === FrameOfReferenceUID
+    );
+    if (found) {
+      return found;
+    }
+  }
+  return null;
+}
+
 function firstItem(seq) {
   return Array.isArray(seq) ? seq[0] : seq;
+}
+
+function naturalize(arrayBuffer) {
+  return dcmjs.data.DicomMetaDictionary.naturalizeDataset(dcmjs.data.DicomMessage.readFile(arrayBuffer).dict);
+}
+
+/** The structure set with its contour points: the metadata OHIF holds, or the whole object when they are bulk data. */
+async function withContourData(instance, headers) {
+  const first = firstItem(firstItem(instance?.ROIContourSequence)?.ContourSequence)?.ContourData;
+  if (Array.isArray(first) && typeof first[0] === 'number') {
+    return instance;
+  }
+  return naturalize(await dicomLoaderService.findDicomDataPromise(instance, null, headers));
 }
 
 function _getDisplaySetsFromSeries(instances, servicesManager: AppTypes.ServicesManager) {
@@ -136,8 +162,7 @@ async function _load(displaySet, headers) {
 
 async function _loadDose(displaySet, headers) {
   const arrayBuffer = await dicomLoaderService.findDicomDataPromise(displaySet, null, headers);
-  const dicomData = dcmjs.data.DicomMessage.readFile(arrayBuffer);
-  const ds = dcmjs.data.DicomMetaDictionary.naturalizeDataset(dicomData.dict);
+  const ds = naturalize(arrayBuffer);
   const dose = readDose(ds);
 
   const referencedVolumeId = displaySet.getReferencedVolumeId();
@@ -151,9 +176,22 @@ async function _loadDose(displaySet, headers) {
   const planUid = firstItem(ds.ReferencedRTPlanSequence)?.ReferencedSOPInstanceUID;
   const structUid = firstItem(ds.ReferencedStructureSetSequence)?.ReferencedSOPInstanceUID;
   const rtplan = planUid ? findInstance(StudyInstanceUID, planUid) : null;
-  const rtstruct = structUid ? findInstance(StudyInstanceUID, structUid) : null;
+  // the structure set the dose references, else the plan's, else one of the same frame of reference in the study
+  const planStructUid = firstItem(rtplan?.ReferencedStructureSetSequence)?.ReferencedSOPInstanceUID;
+  const rtstruct = (structUid && findInstance(StudyInstanceUID, structUid))
+    ?? (planStructUid && findInstance(StudyInstanceUID, planStructUid))
+    ?? structureSetOfFrame(StudyInstanceUID, displaySet.FrameOfReferenceUID);
   displaySet.reference = referenceDose(rtplan, dose.max);
-  displaySet.dvhs = readDVHs(ds, roiInfo(rtstruct));
+  const rois = roiInfo(rtstruct);
+  displaySet.dvhs = readDVHs(ds, rois);
+  if (!displaySet.dvhs.length && rtstruct) {
+    // a dose without the RT DVH module (another system's): the DVHs from the structure set, computed here
+    try {
+      displaySet.dvhs = computeDVHs(dose, structureMasks(await withContourData(rtstruct, headers), dose.geometry), rois);
+    } catch (e) {
+      console.warn('RT Dose: DVHs could not be computed from the structure set', e);
+    }
+  }
   displaySet.dose = { max: dose.max, units: dose.units, type: dose.type, summation: dose.summation, comment: dose.comment };
 
   const onCt = resampleToGrid(dose, { dimensions: ct.dimensions, spacing: ct.spacing, origin: ct.origin, direction: ct.direction });

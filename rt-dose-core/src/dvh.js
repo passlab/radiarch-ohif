@@ -95,3 +95,79 @@ export function readDVHs(rtdose, rois = new Map()) {
   }
   return curves;
 }
+
+const MAX_BINS = 1000;
+
+/** radiarch's DVH bin width (dicom/writers/rtdose.dvh_bin_width): 1, 2 or 5 × 10^k Gy, ≥ 0.01 Gy, ≤ 1000 bins. */
+export function dvhBinWidth(maxGy) {
+  const target = Math.max(0.01, maxGy / (MAX_BINS - 1));
+  const k = Math.floor(Math.log10(target));
+  for (const m of [1, 2, 5, 10]) {
+    if (m * 10 ** k >= target * (1 - 1e-9)) {
+      return parseFloat((m * 10 ** k).toPrecision(6));
+    }
+  }
+  return 10 ** (k + 1);
+}
+
+/**
+ * DVHs computed here, for a dose that carries none: each ROI's mask on the dose grid (rasterize.js), then the
+ * cumulative DVH of the dose in it, in cm³ and %, bins as radiarch writes them. Marked `source: 'computed in the
+ * browser'`, as they differ from the planning system's at structure edges.
+ *
+ * @param {{geometry: object, values: Float32Array}} dose from readDose
+ * @param {Map<number, Uint8Array>} masks from structureMasks
+ * @param {Map<number, {name: string, color: number[] | null}>} [rois] from roiInfo
+ */
+export function computeDVHs(dose, masks, rois = new Map()) {
+  const g = dose.geometry;
+  const voxelCc = (g.colSpacing * g.rowSpacing * (g.frameSpacing || 1)) / 1000;
+  let doseMax = 0;
+  for (const v of dose.values) {
+    doseMax = Math.max(doseMax, v);
+  }
+  const width = dvhBinWidth(doseMax);
+  const curves = [];
+  for (const [roiNumber, mask] of masks) {
+    const inside = [];
+    for (let i = 0; i < mask.length; i++) {
+      if (mask[i]) {
+        inside.push(dose.values[i]);
+      }
+    }
+    if (!inside.length) {
+      continue;
+    }
+    inside.sort((a, b) => a - b);
+    const n = Math.floor(inside[inside.length - 1] / width) + 1;
+    const doseGy = new Float64Array(n);
+    const volume = new Float64Array(n);
+    const percent = new Float64Array(n);
+    let below = 0;
+    for (let b = 0; b < n; b++) {
+      const edge = b * width;
+      while (below < inside.length && inside[below] < edge) {
+        below++;
+      }
+      doseGy[b] = edge;
+      percent[b] = (100 * (inside.length - below)) / inside.length;
+      volume[b] = ((inside.length - below) * voxelCc);
+    }
+    const info = rois.get(roiNumber);
+    curves.push({
+      roiNumber,
+      name: info?.name ?? `ROI ${roiNumber}`,
+      color: info?.color ?? null,
+      doseGy,
+      volume,
+      volumeUnits: 'CM3',
+      percent,
+      maxDoseBinEdgeGy: n * width,
+      minGy: inside[0],
+      maxGy: inside[inside.length - 1],
+      meanGy: inside.reduce((s, v) => s + v, 0) / inside.length,
+      source: 'computed in the browser',
+    });
+  }
+  return curves.sort((a, b) => a.roiNumber - b.roiNumber);
+}
