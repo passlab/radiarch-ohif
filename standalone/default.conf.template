@@ -1,0 +1,40 @@
+# The standalone radiarch viewer (ADR 0018): OHIF, Orthanc's DICOMweb and radiarch's API from one origin.
+# nginx's entrypoint fills ${...} from the environment (unset variables stay empty):
+#   VIEWER_PORT            the port to listen on (80 in the image)
+#   ORTHANC_URL            e.g. http://orthanc:8042 (its DICOMweb plugin at /dicom-web)
+#   ORTHANC_AUTHORIZATION  an Authorization header value for Orthanc ("Basic ..."), or empty
+#   RADIARCH_URL           e.g. http://api:8000
+#   RADIARCH_API_KEY       added to every API request here, so the browser never holds it; empty = none
+# Whoever reaches this server uses radiarch with that key: publish it on localhost, or put an authenticating proxy in
+# front of it. Research use only; not for clinical use.
+
+server {
+    listen ${VIEWER_PORT};
+    client_max_body_size 1g;
+    root /usr/share/nginx/html;
+
+    location /dicom-web/ {
+        proxy_pass ${ORTHANC_URL}/dicom-web/;
+        # Orthanc builds the bulk data URIs of its metadata from the Host it is asked on
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Authorization "${ORTHANC_AUTHORIZATION}";
+        proxy_buffering off;
+        proxy_read_timeout 300s;
+    }
+
+    location /radiarch/api/ {
+        proxy_pass ${RADIARCH_URL}/api/;
+        proxy_set_header Host $http_host;
+        proxy_set_header X-API-Key "${RADIARCH_API_KEY}";
+        proxy_read_timeout 600s;
+    }
+
+    location = /app-config.js {
+        add_header Cache-Control "no-store";
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}

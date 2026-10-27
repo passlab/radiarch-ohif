@@ -163,6 +163,10 @@ async function _loadDose(displaySet, headers) {
     targetBuffer: { type: 'Float32Array' },
   });
   derived.voxelManager.setCompleteScalarDataArray(percent);
+  // the GPU texture holds the derived volume's initial zeros until its frames are marked updated (else the dose,
+  // transparent at zero, is never drawn)
+  derived.invalidate?.();
+  derived.modified?.();
   derived.metadata.voiLut = [csUtils.windowLevel.toWindowLevel(0, 120)];
   derived.loadStatus = { loaded: true };
   return derived;

@@ -5,7 +5,8 @@ const doseFirst = {
   id: 'radiarch-rt-dose',
   locked: true,
   name: 'RT Dose over its CT',
-  protocolMatchingRules: [],
+  // a study with an RT Dose (scores it above protocols without rules when a mode offers several)
+  protocolMatchingRules: [{ attribute: 'ModalitiesInStudy', constraint: { contains: ['RTDOSE'] }, weight: 10 }],
   toolGroupIds: ['default'],
   numberOfPriorsReferenced: 0,
   defaultViewport: {

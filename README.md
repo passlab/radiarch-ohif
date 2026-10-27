@@ -11,7 +11,9 @@ use only, not for clinical use.
 | [`ohif-extension-radiarch/`](ohif-extension-radiarch/) | OHIF extension: the radiarch plan behind the dose on screen (summary, a goal template to evaluate against, the goals graded by radiarch, radiarch's DVHs and indices) | OHIF 3.13.13; a radiarch API |
 | [`ohif-mode-plan-review/`](ohif-mode-plan-review/) | OHIF mode "Plan review" (route `plan-review`): the plan dose over its CT, structures, the series list, and the dose, plan and structure panels; for a study with a CT and an RT Dose | the two extensions |
 
-Still to come (`docs/impl-plan.md`, R13): the standalone viewer image, and checks in a browser.
+| [`standalone/`](standalone/) | The standalone viewer image: OHIF with the packages above, nginx with Orthanc's DICOMweb and radiarch's API on one origin, the API key added by the proxy (`docs/viewing.md`) | Orthanc, a radiarch API |
+
+Still to come (`docs/impl-plan.md`, R13.3): checking the views by hand in a browser with a GPU.
 
 ## Configuration
 

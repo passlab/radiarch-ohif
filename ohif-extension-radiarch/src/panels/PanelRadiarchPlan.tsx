@@ -104,7 +104,7 @@ function PanelRadiarchPlan({ servicesManager }: withAppTypes) {
   const colors = new Map((dose.dvhs ?? []).filter(c => c.color).map(c => [c.name, c.color]));
   const rows = evaluation ? goalRows(evaluation) : [];
   return (
-    <div className="flex flex-col gap-2 p-2 text-sm text-white">
+    <div className="flex w-full min-w-0 flex-col gap-2 overflow-x-hidden break-words p-2 text-sm text-white">
       <div className="text-xs text-yellow-300">{INTENDED_USE}</div>
       <div>
         <div className="font-semibold">Plan</div>
@@ -121,8 +121,8 @@ function PanelRadiarchPlan({ servicesManager }: withAppTypes) {
           machine {s.machineModel ?? s.machine ?? '–'}; engine {s.engine ?? '–'}; radiarch {s.radiarchVersion ?? '–'}; export {s.exportId}
         </div>
       </div>
-      <div className="flex items-center gap-2">
-        <select className="bg-black text-white" value={templateId} onChange={e => setTemplateId(e.target.value)} aria-label="Goal template">
+      <div className="flex min-w-0 items-center gap-2">
+        <select className="w-0 min-w-0 flex-1 truncate bg-black text-white" value={templateId} onChange={e => setTemplateId(e.target.value)} aria-label="Goal template">
           <option value="">no goals (DVHs and indices only)</option>
           {templates.map(t => (
             <option key={t.template_id} value={t.template_id}>
@@ -131,7 +131,7 @@ function PanelRadiarchPlan({ servicesManager }: withAppTypes) {
             </option>
           ))}
         </select>
-        <button className="rounded bg-blue-700 px-2 py-0.5 disabled:opacity-50" disabled={busy} onClick={evaluate}>
+        <button className="shrink-0 rounded bg-blue-700 px-2 py-0.5 disabled:opacity-50" disabled={busy} onClick={evaluate}>
           {busy ? 'Evaluating…' : 'Evaluate'}
         </button>
       </div>
@@ -143,7 +143,7 @@ function PanelRadiarchPlan({ servicesManager }: withAppTypes) {
                 Goals: {evaluation.goals.n_passed} met, {evaluation.goals.n_failed} not met, {evaluation.goals.n_missing} missing
                 {evaluation.goals.all_priority1_passed ? '' : ' (a priority-1 goal is not met)'}
               </div>
-              <table className="w-full text-xs">
+              <table className="w-full table-fixed text-xs">
                 <thead>
                   <tr><th className="text-left">P</th><th className="text-left">Structure</th><th className="text-left">Goal</th><th className="text-right">Achieved</th><th /></tr>
                 </thead>

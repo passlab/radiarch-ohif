@@ -78,7 +78,8 @@ export const modeInstance = {
   modeModalities: [['CT', 'RTDOSE']],
   routes: [planReviewRoute],
   extensions: extensionDependencies,
-  hangingProtocol: [rtDose.hangingProtocol, 'default'],
+  // named, not matched: the mode is valid only for a study with an RT Dose
+  hangingProtocol: rtDose.hangingProtocol,
   // the RT Dose handler first: its SOP class is its own
   sopClassHandlers: [rtDose.sopClassHandler, ...basicSopClassHandlers],
 };

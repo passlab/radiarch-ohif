@@ -21,8 +21,9 @@ export function DVHChart({ curves }) {
   const x = d => PAD.left + (d / maxDose) * (W - PAD.left - PAD.right);
   const y = p => PAD.top + (1 - p / 100) * (H - PAD.top - PAD.bottom);
   const ticks = [0, 0.25, 0.5, 0.75, 1].map(f => f * maxDose);
+  const digits = maxDose < 5 ? 2 : maxDose < 20 ? 1 : 0;
   return (
-    <svg width={W} height={H} role="img" aria-label="Dose-volume histograms" className="bg-black">
+    <svg width="100%" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Dose-volume histograms" className="bg-black">
       {[0, 25, 50, 75, 100].map(p => (
         <g key={`y${p}`}>
           <line x1={PAD.left} x2={W - PAD.right} y1={y(p)} y2={y(p)} stroke="#333" />
@@ -30,7 +31,7 @@ export function DVHChart({ curves }) {
         </g>
       ))}
       {ticks.map(d => (
-        <text key={`x${d}`} x={x(d)} y={H - PAD.bottom + 12} fontSize="9" fill="#aaa" textAnchor="middle">{d.toFixed(0)}</text>
+        <text key={`x${d}`} x={x(d)} y={H - PAD.bottom + 12} fontSize="9" fill="#aaa" textAnchor="middle">{d.toFixed(digits)}</text>
       ))}
       <text x={(W + PAD.left) / 2} y={H - 4} fontSize="9" fill="#aaa" textAnchor="middle">Dose (Gy)</text>
       <text x={10} y={H / 2} fontSize="9" fill="#aaa" textAnchor="middle" transform={`rotate(-90 10 ${H / 2})`}>Volume (%)</text>
@@ -65,7 +66,7 @@ function PanelRTDoseDVH({ servicesManager }: withAppTypes) {
   }
   const levels = isodoseLevels(dose.reference.gy, ISODOSE_PERCENTS);
   return (
-    <div className="flex flex-col gap-2 p-2 text-white">
+    <div className="flex w-full min-w-0 flex-col gap-2 overflow-x-hidden break-words p-2 text-white">
       <div className="text-xs text-yellow-300">RESEARCH USE ONLY. Not for clinical use.</div>
       <div className="text-sm">
         {dose.label}: max {dose.dose.max.toFixed(2)} Gy {dose.dose.type === 'EFFECTIVE' ? '(RBE)' : ''}
