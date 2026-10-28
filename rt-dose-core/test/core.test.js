@@ -21,6 +21,7 @@ import {
   computeDVHs,
   structureMasks,
   dvhBinWidth,
+  planningAids,
 } from '../src/index.js';
 
 const DIR = process.env.RT_DOSE_FIXTURES;
@@ -219,4 +220,17 @@ test('a contour inside another is a hole', () => {
   assert.equal(inside(4, 4), 0);       // in the hole
   assert.equal(inside(9, 9), 0);       // outside
   assert.equal(m.reduce((s, v) => s + v, 0), 8 * 8 - 4 * 4);
+});
+
+test('planning aids are hidden by default: rings, helpers and organ-minus-target structures', () => {
+  const names = ['GTV', 'CTV', 'PTV', 'SpinalCord', 'Lungs', 'Lungs-PTV', 'RingNear', 'z_opt', 'Spinal-Cord', 'Heart'];
+  const aids = planningAids({
+    StructureSetROISequence: names.map((ROIName, i) => ({ ROINumber: i + 1, ROIName })),
+    RTROIObservationsSequence: [
+      { ReferencedROINumber: 1, RTROIInterpretedType: 'GTV' },
+      { ReferencedROINumber: 10, RTROIInterpretedType: 'CONTROL' },
+    ],
+  });
+  assert.deepEqual([...aids].sort(), ['Heart', 'Lungs-PTV', 'RingNear', 'z_opt']);
+  assert.equal(planningAids(undefined).size, 0);
 });

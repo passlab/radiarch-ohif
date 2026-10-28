@@ -11,7 +11,7 @@ import { utils, DicomMetadataStore, Types as OhifTypes } from '@ohif/core';
 import { cache, utilities as csUtils, volumeLoader } from '@cornerstonejs/core';
 import { dicomLoaderService, VOLUME_LOADER_SCHEME } from '@ohif/extension-cornerstone';
 import dcmjs from 'dcmjs';
-import { readDose, readDVHs, roiInfo, referenceDose, relativeDose, resampleToGrid, computeDVHs, structureMasks } from '@radiarch/rt-dose-core';
+import { readDose, readDVHs, roiInfo, referenceDose, relativeDose, resampleToGrid, computeDVHs, structureMasks, planningAids } from '@radiarch/rt-dose-core';
 
 import { SOPClassHandlerId } from './id';
 import { emitDoseLoaded } from './events';
@@ -124,6 +124,9 @@ function _getDisplaySetsFromSeries(instances, servicesManager: AppTypes.Services
       dose: null,
       dvhs: [],
       reference: null,
+      // the dose's structure set, whose contours the viewport draws, and its planning aids, hidden by default
+      structureSetSOPInstanceUID: null,
+      planningAids: new Set(),
     } as any;
 
     // the image display set the dose lies on, found when first needed (at creation the others may not exist yet):
@@ -212,6 +215,8 @@ async function _loadDose(displaySet, headers) {
     ?? (planStructUid && findInstance(StudyInstanceUID, planStructUid))
     ?? structureSetOfFrame(StudyInstanceUID, displaySet.FrameOfReferenceUID);
   displaySet.reference = referenceDose(rtplan, dose.max);
+  displaySet.structureSetSOPInstanceUID = rtstruct?.SOPInstanceUID ?? null;
+  displaySet.planningAids = planningAids(rtstruct);
   const rois = roiInfo(rtstruct);
   displaySet.dvhs = readDVHs(ds, rois);
   if (!displaySet.dvhs.length && rtstruct) {

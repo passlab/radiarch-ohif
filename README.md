@@ -59,6 +59,11 @@ push (the job "Viewer") and checks that both extensions and the mode are in the 
    opacity texture by that function's time stamp.
 6. **DVHs.** The DVH panel shows the curves stored in the RT Dose, named and coloured by the structure
    set the dose references. For a radiarch export these are radiarch's own DVHs, computed on its grid.
+7. **Contours.** The structure set the dose references (directly or through its plan; else one of the same
+   frame of reference) is loaded by OHIF's RT handler and drawn as contours in the dose viewport, once the
+   dose is loaded; OHIF's segmentation panel lists its structures. Planning aids start hidden, in the
+   viewport and in the DVH panel (`planningAids` in rt-dose-core): ROIs interpreted as avoidance, control
+   and the like, rings and optimisation helpers, and organ-minus-target structures such as `Lungs-PTV`.
 
 OHIF 3.13.13 draws a derived overlay volume only for display sets of its pseudo-modality `PMAP`, so a
 dose display set carries that modality, its own label, and `isRTDose`. A change in OHIF's handling

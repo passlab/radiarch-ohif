@@ -52,6 +52,7 @@ function PanelRTDoseDVH({ servicesManager }: withAppTypes) {
   const { displaySetService } = servicesManager.services;
   const [{ activeViewportId, viewports }] = useViewportGrid();
   const [, setLoadedCount] = useState(0);
+  const [showAids, setShowAids] = useState(false);
 
   useEffect(() => onDoseLoaded(() => setLoadedCount(n => n + 1)), []);
 
@@ -65,6 +66,9 @@ function PanelRTDoseDVH({ servicesManager }: withAppTypes) {
     return <div className="p-2 text-sm text-white">Loading the dose…</div>;
   }
   const levels = isodoseLevels(dose.reference.gy, ISODOSE_PERCENTS);
+  // targets and organs; planning aids (rings, organ minus target) only on request
+  const aids = dose.dvhs.filter(c => dose.planningAids?.has(c.name));
+  const curves = showAids ? dose.dvhs : dose.dvhs.filter(c => !dose.planningAids?.has(c.name));
   return (
     <div className="flex w-full min-w-0 flex-col gap-2 overflow-x-hidden break-words p-2 text-white">
       <div className="text-xs text-yellow-300">RESEARCH USE ONLY. Not for clinical use.</div>
@@ -73,7 +77,7 @@ function PanelRTDoseDVH({ servicesManager }: withAppTypes) {
       </div>
       {dose.dvhs.length ? (
         <>
-          <DVHChart curves={dose.dvhs} />
+          <DVHChart curves={curves} />
           <div className="text-xs text-gray-300">
             {dose.dvhs[0].source === 'file'
               ? 'DVHs from the RT Dose file (computed by the system that wrote it).'
@@ -84,7 +88,7 @@ function PanelRTDoseDVH({ servicesManager }: withAppTypes) {
               <tr><th className="text-left">Structure</th><th>Min</th><th>Mean</th><th>Max (Gy)</th></tr>
             </thead>
             <tbody>
-              {dose.dvhs.map(c => (
+              {curves.map(c => (
                 <tr key={c.roiNumber}>
                   <td><span style={{ color: rgb(c.color) }}>■</span> {c.name}</td>
                   <td className="text-right">{c.minGy?.toFixed(2) ?? '–'}</td>
@@ -94,6 +98,12 @@ function PanelRTDoseDVH({ servicesManager }: withAppTypes) {
               ))}
             </tbody>
           </table>
+          {aids.length > 0 && (
+            <label className="text-xs text-gray-300">
+              <input type="checkbox" className="mr-1" checked={showAids} onChange={e => setShowAids(e.target.checked)} />
+              Show {aids.length} planning aid{aids.length > 1 ? 's' : ''} ({aids.map(c => c.name).join(', ')})
+            </label>
+          )}
         </>
       ) : (
         <div className="text-xs text-gray-300">This RT Dose carries no DVHs.</div>

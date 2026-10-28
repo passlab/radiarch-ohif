@@ -5,6 +5,7 @@
 import PropTypes from 'prop-types';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { OHIFCornerstoneViewport } from '@ohif/extension-cornerstone';
+import { Enums as csToolsEnums } from '@cornerstonejs/tools';
 
 import { doseColormap, isodoseLevels } from '@radiarch/rt-dose-core';
 import { COLORMAP_NAME } from '../id';
@@ -26,7 +27,8 @@ export function isodoseColormap() {
 
 function OHIFCornerstoneRTDoseViewport(props: withAppTypes) {
   const { displaySets, children, viewportOptions, displaySetOptions, servicesManager } = props;
-  const { customizationService, cornerstoneViewportService } = servicesManager.services;
+  const { customizationService, cornerstoneViewportService, displaySetService, segmentationService, userAuthenticationService } =
+    servicesManager.services;
 
   if (displaySets.length !== 1) {
     throw new Error('The RT Dose viewport takes one dose display set');
@@ -48,10 +50,34 @@ function OHIFCornerstoneRTDoseViewport(props: withAppTypes) {
 
   // once Cornerstone has mounted the volumes (and after any remount), give the dose its opacity per slice; marking
   // the opacity function modified rebuilds the opacity texture, which is cached by that function's time stamp. The
-  // first time, move to the slice through the dose maximum: the middle slice may hold little or no dose.
+  // first time, move to the slice through the dose maximum (the middle slice may hold little or no dose), and draw
+  // the dose's structure set as contours over the CT and the dose (OHIF's segmentation panel lists them), planning
+  // aids (rings, organ minus target) hidden. Contours added before the volumes are mounted make Cornerstone's
+  // contour display throw on every render ("No actor found"), hence here.
   const opened = useRef(false);
+  const contoured = useRef(false);
   useEffect(() => {
     const viewportId = viewportOptions.viewportId;
+    const drawContours = async () => {
+      const uid = doseDisplaySet.structureSetSOPInstanceUID;
+      const rt = uid && displaySetService.getActiveDisplaySets().find(ds => ds.Modality === 'RTSTRUCT' && ds.SOPInstanceUID === uid);
+      if (!rt || contoured.current) {
+        return;
+      }
+      contoured.current = true;
+      await rt.load({ headers: userAuthenticationService.getAuthorizationHeader() });
+      const segmentationId = rt.displaySetInstanceUID;
+      await segmentationService.addSegmentationRepresentation(viewportId, {
+        segmentationId,
+        type: csToolsEnums.SegmentationRepresentations.Contour,
+      });
+      const segments = segmentationService.getSegmentation(segmentationId)?.segments ?? {};
+      for (const [index, segment] of Object.entries(segments)) {
+        if (segment && doseDisplaySet.planningAids?.has(segment.label)) {
+          segmentationService.setSegmentVisibility(viewportId, segmentationId, Number(index), false);
+        }
+      }
+    };
     const apply = () => {
       const viewport = cornerstoneViewportService.getCornerstoneViewport(viewportId);
       const dose = viewport?.getActors?.().find(a => String(a.referencedId).endsWith(doseDisplaySet.displaySetInstanceUID));
@@ -73,6 +99,10 @@ function OHIFCornerstoneRTDoseViewport(props: withAppTypes) {
         viewport.setCamera({ focalPoint: move(focalPoint), position: move(position) });
         viewport.render();
       }
+      drawContours().catch(e => {
+        contoured.current = false;
+        console.warn('RT Dose: the structure set could not be drawn', e);
+      });
     };
     const { unsubscribe } = cornerstoneViewportService.subscribe(
       cornerstoneViewportService.EVENTS.VIEWPORT_VOLUMES_CHANGED,
@@ -80,7 +110,8 @@ function OHIFCornerstoneRTDoseViewport(props: withAppTypes) {
     );
     apply();
     return unsubscribe;
-  }, [cornerstoneViewportService, viewportOptions.viewportId, doseDisplaySet, loading]);
+  }, [cornerstoneViewportService, displaySetService, segmentationService, userAuthenticationService, viewportOptions.viewportId,
+    doseDisplaySet, loading]);
 
   const getCornerstoneViewport = useCallback(() => {
     const cmap = isodoseColormap();
