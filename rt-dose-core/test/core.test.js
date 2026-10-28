@@ -22,6 +22,7 @@ import {
   structureMasks,
   dvhBinWidth,
   planningAids,
+  isBlankImage,
 } from '../src/index.js';
 
 const DIR = process.env.RT_DOSE_FIXTURES;
@@ -233,4 +234,16 @@ test('planning aids are hidden by default: rings, helpers and organ-minus-target
   });
   assert.deepEqual([...aids].sort(), ['Heart', 'Lungs-PTV', 'RingNear', 'z_opt']);
   assert.equal(planningAids(undefined).size, 0);
+});
+
+test('a black viewport is blank, one drawn pixel is not', () => {
+  const black = new Uint8ClampedArray(64 * 4).fill(0);
+  for (let i = 3; i < black.length; i += 4) {
+    black[i] = 255;                                                 // opaque black
+  }
+  assert.equal(isBlankImage(black), true);
+  const drawn = black.slice();
+  drawn[40 * 4 + 1] = 90;                                           // one grey-green pixel
+  assert.equal(isBlankImage(drawn), false);
+  assert.equal(isBlankImage([5, 5, 5, 255]), true);                 // noise below the threshold
 });

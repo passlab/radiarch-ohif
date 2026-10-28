@@ -64,6 +64,10 @@ push (the job "Viewer") and checks that both extensions and the mode are in the 
    dose is loaded; OHIF's segmentation panel lists its structures. Planning aids start hidden, in the
    viewport and in the DVH panel (`planningAids` in rt-dose-core): ROIs interpreted as avoidance, control
    and the like, rings and optimisation helpers, and organ-minus-target structures such as `Lungs-PTV`.
+8. **A black image.** Chrome's default backend on Linux (ANGLE on OpenGL) draws 3D volumes black without an error.
+   Once the volumes are mounted, the viewport samples its canvas every 3 s (`isBlankImage` in rt-dose-core); black
+   three times running, it shows a warning naming the fix (Firefox, or `chrome://flags/#use-angle` set to Vulkan),
+   and removes it when something is drawn.
 
 OHIF 3.13.13 draws a derived overlay volume only for display sets of its pseudo-modality `PMAP`, so a
 dose display set carries that modality, its own label, and `isRTDose`. A change in OHIF's handling

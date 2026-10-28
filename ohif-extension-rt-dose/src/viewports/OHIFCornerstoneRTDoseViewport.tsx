@@ -7,7 +7,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { OHIFCornerstoneViewport } from '@ohif/extension-cornerstone';
 import { Enums as csToolsEnums } from '@cornerstonejs/tools';
 
-import { doseColormap, isodoseLevels } from '@radiarch/rt-dose-core';
+import { doseColormap, isodoseLevels, isBlankImage } from '@radiarch/rt-dose-core';
 import { COLORMAP_NAME } from '../id';
 import { onDoseLoaded } from '../events';
 
@@ -19,6 +19,28 @@ export const DOSE_OPACITY = 0.45;
 // almost invisible over the CT. At 0.15 mm the bands are clearly coloured and the CT shows through (0.05 hides it,
 // 0.3 darkens the colours); chosen by eye on a lung plan.
 export const OPACITY_UNIT_DISTANCE_MM = 0.15;
+// Chrome's default OpenGL backend on Linux (seen on NVIDIA) draws every 3D volume black, without an error: the
+// viewport samples what it drew every few seconds once the volumes are mounted and says so while it stays black.
+const BLANK_CHECK_MS = 3000;
+const BLANK_CHECKS = 10;
+const BLANK_AFTER = 3;
+
+/** True when the viewport's canvas is black (a 32 × 32 sample); null when it cannot be read. */
+function viewportIsBlank(viewport) {
+  const canvas = viewport?.canvas;
+  if (!canvas?.width || !canvas?.height) {
+    return null;
+  }
+  try {
+    const sample = document.createElement('canvas');
+    sample.width = sample.height = 32;
+    const ctx = sample.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(canvas, 0, 0, 32, 32);
+    return isBlankImage(ctx.getImageData(0, 0, 32, 32).data);
+  } catch (e) {
+    return null;
+  }
+}
 
 /** The isodose colormap in %, registered once with Cornerstone (index.tsx) and used by every dose viewport. */
 export function isodoseColormap() {
@@ -37,6 +59,7 @@ function OHIFCornerstoneRTDoseViewport(props: withAppTypes) {
   const referencedDisplaySet = doseDisplaySet.getReferenceDisplaySet();
   const LoadingIndicatorTotalPercent = customizationService.getCustomization('ui.loadingIndicatorTotalPercent');
   const [loading, setLoading] = useState(!doseDisplaySet.isLoaded);
+  const [blank, setBlank] = useState(false);
 
   useEffect(
     () =>
@@ -113,6 +136,32 @@ function OHIFCornerstoneRTDoseViewport(props: withAppTypes) {
   }, [cornerstoneViewportService, displaySetService, segmentationService, userAuthenticationService, viewportOptions.viewportId,
     doseDisplaySet, loading]);
 
+  // nothing drawn after the volumes are mounted: say why, rather than show a black square
+  useEffect(() => {
+    if (loading) {
+      return;
+    }
+    let checks = 0;
+    let blankChecks = 0;
+    const timer = setInterval(() => {
+      checks += 1;
+      const isBlank = viewportIsBlank(cornerstoneViewportService.getCornerstoneViewport(viewportOptions.viewportId));
+      if (isBlank === false) {
+        setBlank(false);
+        clearInterval(timer);
+        return;
+      }
+      blankChecks = isBlank ? blankChecks + 1 : blankChecks;
+      if (blankChecks >= BLANK_AFTER) {
+        setBlank(true);
+      }
+      if (checks >= BLANK_CHECKS) {
+        clearInterval(timer);
+      }
+    }, BLANK_CHECK_MS);
+    return () => clearInterval(timer);
+  }, [loading, cornerstoneViewportService, viewportOptions.viewportId]);
+
   const getCornerstoneViewport = useCallback(() => {
     const cmap = isodoseColormap();
     const doseOptions = {
@@ -148,6 +197,12 @@ function OHIFCornerstoneRTDoseViewport(props: withAppTypes) {
       )}
       {getCornerstoneViewport()}
       {childrenWithProps}
+      {blank && (
+        <div data-cy="rt-dose-blank-warning" className="pointer-events-none absolute left-1/2 top-1/3 w-2/3 -translate-x-1/2 rounded bg-black/80 p-3 text-sm text-yellow-300">
+          This browser draws the CT and the dose black: its WebGL backend cannot render 3D volumes (seen with Chrome&apos;s
+          default OpenGL backend on Linux). Use Firefox, or in Chrome set chrome://flags/#use-angle to Vulkan and relaunch.
+        </div>
+      )}
       <div className="pointer-events-none absolute bottom-2 left-2 text-xs text-white opacity-80">
         RESEARCH USE ONLY. Isodoses in % of {doseDisplaySet.reference?.source === 'prescription' ? 'the prescription' : 'the dose maximum'}
         {doseDisplaySet.reference ? ` (${doseDisplaySet.reference.gy.toFixed(2)} Gy)` : ''}
