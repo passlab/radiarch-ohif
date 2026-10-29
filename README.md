@@ -37,7 +37,8 @@ reaches the browser: the proxy, or a host's gateway, authenticates the user and 
    - optionally the panel `@radiarch/ohif-extension-rt-dose.panelModule.rt-dose-dvh`.
 
 For the radiarch panel, also register `@radiarch/ohif-extension-radiarch`, put `radiarch-client` in
-the workspace, and add the panel `@radiarch/ohif-extension-radiarch.panelModule.radiarch-plan`. Or use
+the workspace, and add the panel `@radiarch/ohif-extension-radiarch.panelModule.radiarch-plan` (and, for MCO plans,
+`@radiarch/ohif-extension-radiarch.panelModule.radiarch-mco`). Or use
 the plan-review mode, which brings all of them; register it in `pluginConfig.json`'s `modes`.
 
 `scripts/build-ohif.sh` does all of this on a clean OHIF checkout and builds it. CI runs it on every

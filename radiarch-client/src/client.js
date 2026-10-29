@@ -106,5 +106,49 @@ export function createClient({ apiUrl, headers = () => ({}), fetch: fetchImpl = 
 
     /** The lineage node of a version (its parents and children). */
     lineage: async (kind, id) => (await request('GET', `/lineage/${kind}/${id}`)).data,
+
+    // --- multi-criteria optimization (R11) -------------------------------------------------------------------------
+
+    /** The deliverable plans (of a Pareto set) that made a dose or a beam model, newest first. */
+    findDeliverables: async ({ doseId, beamModelId, limit } = {}) =>
+      (await request('GET', '/mco/deliverables', { query: { dose_id: doseId, beam_model_id: beamModelId, limit } })).data,
+
+    /**
+     * The Pareto set behind an export's dose, or null: the set, its stored states and the deliverable plan that made the
+     * dose (whose state_id is where navigation starts).
+     */
+    paretoSetOf: async exp => {
+      if (!exp?.dose_id) {
+        return null;
+      }
+      const [plan] = (await request('GET', '/mco/deliverables', { query: { dose_id: exp.dose_id, limit: 1 } })).data;
+      if (!plan) {
+        return null;
+      }
+      const [set, states] = await Promise.all([
+        request('GET', `/mco/${plan.mco_id}`).then(r => r.data),
+        request('GET', `/mco/${plan.mco_id}/states`).then(r => r.data),
+      ]);
+      return { set, states, plan };
+    },
+
+    /** A navigation step from a state: a slider move, a reference point, clamps and locks (NavigateRequest). */
+    navigate: async (mcoId, body) => (await request('POST', `/mco/${mcoId}/navigate`, { body })).data,
+
+    /** The blend that best meets a goal set, priority by priority (AutoNavigateRequest). */
+    autoNavigate: async (mcoId, body) => (await request('POST', `/mco/${mcoId}/auto-navigate`, { body })).data,
+
+    /** A state made deliverable (DeliverableRequest): a stored plan at once, else the job followed to its result. */
+    makeDeliverable: async (mcoId, body) => {
+      const { status, data } = await request('POST', `/mco/${mcoId}/deliverable`, { body });
+      if (status === 200) {
+        return data;
+      }
+      const deliverableId = await follow('mco/deliverables', data, 'deliverable_id');
+      return (await request('GET', `/mco/deliverables/${deliverableId}`)).data;
+    },
+
+    /** Write (and, with push, send to the DICOMweb server) the RT objects of a plan (RTExportRequest). */
+    exportPlan: async body => (await request('POST', '/rt/export', { body })).data,
   };
 }

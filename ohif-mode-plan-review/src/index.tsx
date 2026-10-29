@@ -1,6 +1,6 @@
 // @radiarch/mode-plan-review: review a radiotherapy plan (layer three of ADR 0018). The plan dose opens over its CT
 // (hanging protocol 'radiarch-rt-dose'), structure sets over the images, the study's series on the left and, on the
-// right, the dose's DVHs, the radiarch plan with its clinical goals, and the structures. Built on OHIF's basic mode;
+// right, the dose's DVHs, the radiarch plan with its clinical goals, the Pareto set of an MCO plan, and the structures. Built on OHIF's basic mode;
 // valid for a study with a CT and an RT Dose. Research use only; not for clinical use.
 
 import {
@@ -31,6 +31,7 @@ export const rtDose = {
 
 export const radiarch = {
   planPanel: `${RADIARCH}.panelModule.radiarch-plan`,
+  mcoPanel: `${RADIARCH}.panelModule.radiarch-mco`,
 };
 
 export const extensionDependencies = {
@@ -44,7 +45,7 @@ export const planReviewLayout = {
   props: {
     leftPanels: [ohif.thumbnailList],
     leftPanelResizable: true,
-    rightPanels: [rtDose.dvhPanel, radiarch.planPanel, cornerstone.segmentation],
+    rightPanels: [rtDose.dvhPanel, radiarch.planPanel, radiarch.mcoPanel, cornerstone.segmentation],
     rightPanelResizable: true,
     viewports: [
       { namespace: cornerstone.viewport, displaySetsToDisplay: [ohif.sopClassHandler] },

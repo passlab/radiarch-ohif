@@ -79,3 +79,64 @@ export function evaluationCurves(evaluation, colors = new Map()) {
     source: 'radiarch evaluation',
   }));
 }
+
+/** A trade-off's name as radiarch writes it: ``Type(Structure)``. */
+export function tradeoffName(objective) {
+  return `${objective.type}(${objective.structure_name})`;
+}
+
+/**
+ * A navigation state's trade-offs against their range on the Pareto set: the exact value (on a robust set its worst
+ * case over the scenarios, and the nominal value beside it), the linear bound navigation searched with, and the best
+ * and worst any anchor plan reached.
+ *
+ * @param {object} set an MCOResult
+ * @param {object} state a NavigationState
+ */
+export function tradeoffRows(set, state) {
+  return (set?.tradeoffs ?? []).map((o, i) => ({
+    index: i,
+    name: tradeoffName(o),
+    valueGy: state?.values_gy?.[i] ?? null,
+    nominalGy: state?.nominal_gy?.[i] ?? null,
+    boundGy: state?.bound_gy?.[i] ?? null,
+    idealGy: set.ideal_gy[i],
+    nadirGy: set.nadir_gy[i],
+    normalized: state?.normalized?.[i] ?? null,
+    clamp: state?.clamps?.[tradeoffName(o)] ?? null,
+  }));
+}
+
+/**
+ * A navigation state's DVHs as chart curves (the shape DVHChart draws), coloured by structure name when known.
+ *
+ * @param {object} state a NavigationState
+ * @param {Map<string, number[]>} [colors] structure name → RGB 0–255
+ */
+export function stateCurves(state, colors = new Map()) {
+  return (state?.dvh ?? []).map((c, i) => ({
+    roiNumber: i + 1,
+    name: c.structure,
+    color: colors.get(c.structure) ?? null,
+    doseGy: c.dose_gy,
+    percent: c.volume_pct,
+    maxDoseBinEdgeGy: c.dose_gy.length ? c.dose_gy[c.dose_gy.length - 1] : 0,
+    minGy: null,
+    meanGy: null,
+    maxGy: null,
+    source: 'radiarch navigation',
+  }));
+}
+
+/**
+ * A deliverable plan's deviation table, the flagged rows first: navigated, projected and deliverable values and how
+ * much worse the deliverable plan is.
+ *
+ * @param {object} plan an MCODeliverable
+ */
+export function deviationRows(plan) {
+  return (plan?.deviation ?? [])
+    .map(r => ({ name: r.name, kind: r.kind, unit: r.unit, navigated: r.navigated, projected: r.projected ?? null,
+                 deliverable: r.deliverable, worseBy: r.worse_by, flagged: !!r.flagged }))
+    .sort((a, b) => Number(b.flagged) - Number(a.flagged));
+}
