@@ -42,7 +42,9 @@ the workspace, and add the panel `@radiarch/ohif-extension-radiarch.panelModule.
 the plan-review mode, which brings all of them; register it in `pluginConfig.json`'s `modes`.
 
 `scripts/build-ohif.sh` does all of this on a clean OHIF checkout and builds it. CI runs it on every
-push (the job "Viewer") and checks that both extensions and the mode are in the bundle.
+push (the job "Viewer") and checks that both extensions and the mode are in the bundle. With `OHIF_DIR` set, it
+uses an existing OHIF checkout instead of cloning (a fork or a patched tree, at the pinned release): the packages are
+added to that workspace and it is built in place.
 
 ## How the dose is shown
 

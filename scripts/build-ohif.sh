@@ -3,17 +3,28 @@
 # that release, and the static app the standalone viewer serves (R13.2d). Needs git, Node >= 24 and corepack (pnpm).
 #
 #   viewer/scripts/build-ohif.sh [work dir]      # default: a new temporary directory; prints the dist path
+#   OHIF_DIR=/path/to/Viewers viewer/scripts/build-ohif.sh
+#                                                # an existing OHIF checkout (a fork, a patched tree) in place of the
+#                                                # clone: the packages are added to it and it is built there; it should
+#                                                # be at the pinned release
 #
 # Several GB of memory and about ten minutes: run it in CI, or locally when the machine is free.
 set -euo pipefail
 
 OHIF_VERSION="${OHIF_VERSION:-v3.13.13}"
 VIEWER="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-WORK="${1:-$(mktemp -d)}"
-OHIF="$WORK/Viewers"
-
-if [ ! -d "$OHIF/.git" ]; then
-  git clone --quiet --depth 1 --branch "$OHIF_VERSION" https://github.com/OHIF/Viewers.git "$OHIF"
+if [ -n "${OHIF_DIR:-}" ]; then
+  OHIF="$(cd "$OHIF_DIR" 2>/dev/null && pwd)" || { echo "OHIF_DIR $OHIF_DIR: no such directory" >&2; exit 2; }
+  if [ ! -f "$OHIF/platform/app/pluginConfig.json" ]; then
+    echo "OHIF_DIR $OHIF: not an OHIF checkout (no platform/app/pluginConfig.json)" >&2
+    exit 2
+  fi
+else
+  WORK="${1:-$(mktemp -d)}"
+  OHIF="$WORK/Viewers"
+  if [ ! -d "$OHIF/.git" ]; then
+    git clone --quiet --depth 1 --branch "$OHIF_VERSION" https://github.com/OHIF/Viewers.git "$OHIF"
+  fi
 fi
 
 # radiarch's packages join OHIF's pnpm workspace: libraries and extensions under extensions/, the mode under modes/
