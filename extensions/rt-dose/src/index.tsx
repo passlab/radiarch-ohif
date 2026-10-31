@@ -1,4 +1,4 @@
-// @radiarch/ohif-extension-rt-dose: DICOM RT Dose in OHIF 3.13 (layer one of ADR 0018). It needs no radiarch server:
+// @radiarch/extension-rt-dose: DICOM RT Dose in OHIF 3.13 (layer one of ADR 0018). It needs no radiarch server:
 // any system's RT Dose is shown over its CT, with the DVHs the dose carries. Research use only; not for clinical use.
 //
 // A mode uses it by adding `${id}.sopClassHandlerModule.rt-dose` to its SOP class handlers, the viewport

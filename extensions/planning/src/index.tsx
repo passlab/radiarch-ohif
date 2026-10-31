@@ -1,4 +1,4 @@
-// @radiarch/ohif-extension-radiarch: the radiarch plan behind the dose on screen (layer two of ADR 0018). It needs a
+// @radiarch/extension-planning: the radiarch plan behind the dose on screen (layer two of ADR 0018). It needs a
 // radiarch API, at `apiUrl` from the extension's configuration or the app config's `radiarch` block (default
 // /radiarch/api/v1, where the standalone viewer's proxy serves it); requests carry OHIF's authorization header. A second
 // panel navigates the Pareto set behind an MCO plan (R11.7).

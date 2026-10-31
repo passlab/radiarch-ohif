@@ -5,7 +5,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useViewportGrid } from '@ohif/ui-next';
 import { createClient, planSummary, goalRows, evaluationCurves, INTENDED_USE } from '@radiarch/client';
-import { DVHChart, onDoseLoaded } from '@radiarch/ohif-extension-rt-dose';
+import { DVHChart, onDoseLoaded } from '@radiarch/extension-rt-dose';
 
 import { getConfig } from '../config';
 

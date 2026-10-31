@@ -59,7 +59,7 @@ export function goalRows(evaluation) {
 }
 
 /**
- * An evaluation's DVHs as chart curves (the shape @radiarch/ohif-extension-rt-dose's DVHChart draws), coloured by
+ * An evaluation's DVHs as chart curves (the shape @radiarch/extension-rt-dose's DVHChart draws), coloured by
  * structure name when the colours are known.
  *
  * @param {object} evaluation an EvaluationResult

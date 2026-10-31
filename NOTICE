@@ -1,0 +1,9 @@
+radiarch-ohif
+Copyright 2026 The Radiarch Project
+
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+Intended use: research only, not for clinical use (see README.md).
+
+The packages are built into OHIF (https://github.com/OHIF/Viewers, MIT License), which
+scripts/build-ohif.sh fetches at its pinned release; OHIF's code is not part of this repository.

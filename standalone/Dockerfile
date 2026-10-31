@@ -1,6 +1,6 @@
 # The standalone radiarch viewer: OHIF 3.13.13 with radiarch's extensions and plan review mode, served by nginx with
-# Orthanc's DICOMweb and radiarch's API behind the same origin (ADR 0018). Build from the viewer/ directory:
-#   docker build -f standalone/Dockerfile -t radiarch-viewer viewer/
+# Orthanc's DICOMweb and radiarch's API behind the same origin (radiarch's ADR 0018). Build from this repository's root:
+#   docker build -f standalone/Dockerfile -t radiarch-viewer .
 # Research use only; not for clinical use.
 
 FROM node:24-bookworm AS build

@@ -1,5 +1,5 @@
 {
-  "name": "@radiarch/ohif-extension-rt-dose",
+  "name": "@radiarch/extension-rt-dose",
   "version": "0.1.0",
   "description": "OHIF extension: DICOM RT Dose as a colour wash over the CT, isodose levels of the prescription, and the DVHs the dose carries. Research use only; not for clinical use.",
   "author": "The Radiarch Project",

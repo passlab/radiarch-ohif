@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "40 3 * * *"
+  workflow_dispatch:
+
+jobs:
+  packages:
+    # The tests that need no server: the dose core, the API client's offline helpers, the build script on a stub
+    # checkout. Radiarch's CI runs the tests against its own objects and API, and the browser test.
+    name: Package tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - run: |
+          node --test libs/rt-dose-core/test/core.test.js
+          node --test libs/radiarch-client/test/client.test.js
+          node --test libs/radiarch-client/test/mco.test.js
+          node --test scripts/test/build-ohif.test.mjs
+
+  image:
+    # The standalone viewer image: OHIF 3.13.13 built with the extensions and the mode, nginx in front
+    name: Standalone image
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the viewer image (OHIF with the packages, nginx)
+        run: docker build -f standalone/Dockerfile -t radiarch-viewer:ci .
+      - name: The extensions and the mode are in the bundle
+        run: |
+          docker run --rm --entrypoint sh radiarch-viewer:ci -c '
+            cd /usr/share/nginx/html &&
+            grep -rlq "radiarch-isodose" . && grep -rlq "radiarch.goalTemplate" . &&
+            grep -rlq "Plan review (radiarch, research)" . && echo "radiarch extensions and mode bundled"'

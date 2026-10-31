@@ -19,8 +19,8 @@ import {
 
 import { id } from './id';
 
-const RT_DOSE = '@radiarch/ohif-extension-rt-dose';
-const RADIARCH = '@radiarch/ohif-extension-radiarch';
+const RT_DOSE = '@radiarch/extension-rt-dose';
+const RADIARCH = '@radiarch/extension-planning';
 
 export const rtDose = {
   sopClassHandler: `${RT_DOSE}.sopClassHandlerModule.rt-dose`,
