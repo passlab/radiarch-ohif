@@ -4,9 +4,10 @@
 // calculation), and the panel shows the new state's values, goals and DVHs. Automatic navigation works by a goal
 // template's priorities. "Make deliverable" makes the state a plan as the dose on screen was made, with its deviation
 // table; "Export and open" writes it beside this plan and opens it in the viewer. Requests carry the host's
-// authorization header (ADR 0018).
+// authorization header (ADR 0018). A deliverable arc plan takes hours: the panel follows its job to the end and shows
+// its progress, and stops following (the job runs on) when the panel closes or another dose comes on screen.
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useViewportGrid } from '@ohif/ui-next';
 import { createClient, tradeoffRows, stateCurves, deviationRows, goalRows, INTENDED_USE } from '@radiarch/client';
 import { DVHChart, onDoseLoaded } from '@radiarch/extension-rt-dose';
@@ -32,6 +33,8 @@ function PanelRadiarchMCO({ servicesManager }: withAppTypes) {
   const [exported, setExported] = useState(null);
   const [busy, setBusy] = useState(null);
   const [error, setError] = useState(null);
+  const waiting = useRef(null);
+  const stopWaiting = () => waiting.current?.abort();
 
   const client = useMemo(
     () => createClient({ apiUrl: getConfig().apiUrl, headers: () => userAuthenticationService?.getAuthorizationHeader?.() ?? {} }),
@@ -44,8 +47,11 @@ function PanelRadiarchMCO({ servicesManager }: withAppTypes) {
   const dose = uids.map(uid => displaySetService.getDisplaySetByUID(uid)).find(ds => ds?.isRTDose);
   const sopInstanceUid = dose?.SOPInstanceUID ?? null;
 
+  useEffect(() => stopWaiting, []);
+
   useEffect(() => {
     let cancelled = false;
+    stopWaiting();
     setExp(null);
     setFound(null);
     setState(null);
@@ -85,7 +91,9 @@ function PanelRadiarchMCO({ servicesManager }: withAppTypes) {
     try {
       await fn();
     } catch (e) {
-      setError(e.message);
+      if (e?.name !== 'AbortError') {
+        setError(e.message);
+      }
     } finally {
       setBusy(null);
     }
@@ -120,7 +128,13 @@ function PanelRadiarchMCO({ servicesManager }: withAppTypes) {
     run('Making the plan deliverable…', async () => {
       const before = found.plan.request ?? {};
       const goals = templateId ? { goals: { template_id: templateId }, prescription_gy: rx?.dose_gy ?? null } : {};
-      setPlan(await client.makeDeliverable(found.set.mco_id, { ...before, state_id: state.state_id, ...goals }));
+      const wait = (waiting.current = new AbortController());
+      const onProgress = s =>
+        setBusy(`Making the plan deliverable… ${Math.round(100 * (s.progress ?? 0))} %${s.stage ? ` (${s.stage})` : ''}. An arc plan can take hours.`);
+      const made = await client.makeDeliverable(found.set.mco_id, { ...before, state_id: state.state_id, ...goals }, { onProgress, signal: wait.signal });
+      if (!wait.signal.aborted) {
+        setPlan(made);
+      }
     });
 
   const exportAndOpen = () =>

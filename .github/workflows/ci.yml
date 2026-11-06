@@ -24,6 +24,7 @@ jobs:
           node --test libs/rt-dose-core/test/core.test.js
           node --test libs/radiarch-client/test/client.test.js
           node --test libs/radiarch-client/test/mco.test.js
+          node --test libs/radiarch-client/test/jobs.test.js
           node --test scripts/test/build-ohif.test.mjs
 
   image:

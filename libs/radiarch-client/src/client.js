@@ -9,13 +9,28 @@ export class RadiarchApiError extends Error {
   }
 }
 
-const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+const sleep = (ms, signal) =>
+  new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      return reject(signal.reason);
+    }
+    const t = setTimeout(resolve, ms);
+    signal?.addEventListener('abort', () => (clearTimeout(t), reject(signal.reason)), { once: true });
+  });
+
+// While a job is followed, a gateway or network error is retried this many times in a row before the wait fails.
+const POLL_ERRORS = 5;
+const TRANSIENT = new Set([502, 503, 504]);
 
 /**
- * @param {{apiUrl: string, headers?: () => (object | Promise<object>), fetch?: typeof fetch, pollMs?: number, timeoutMs?: number}} options
- *   apiUrl: radiarch's API base, e.g. "/radiarch/api/v1"; headers: called per request (a host's authorization header)
+ * @param {{apiUrl: string, headers?: () => (object | Promise<object>), fetch?: typeof fetch, pollMs?: number,
+ *   pollMaxMs?: number, timeoutMs?: number, now?: () => number}} options
+ *   apiUrl: radiarch's API base, e.g. "/radiarch/api/v1"; headers: called per request (a host's authorization header).
+ *   A job is followed until it ends (a deliverable arc plan takes hours): polls start every pollMs and slow to
+ *   pollMaxMs; timeoutMs, when given, stops the wait (not the job) after that long.
  */
-export function createClient({ apiUrl, headers = () => ({}), fetch: fetchImpl = globalThis.fetch, pollMs = 500, timeoutMs = 300000 }) {
+export function createClient({ apiUrl, headers = () => ({}), fetch: fetchImpl = globalThis.fetch, pollMs = 500, pollMaxMs = 5000,
+                               timeoutMs = Infinity, now = () => Date.now() }) {
   const base = String(apiUrl).replace(/\/+$/, '');
 
   async function request(method, path, { query, body, expect = [200, 201, 202] } = {}) {
@@ -40,21 +55,41 @@ export function createClient({ apiUrl, headers = () => ({}), fetch: fetchImpl = 
     return { status: resp.status, data };
   }
 
-  /** Follow a 202 answer (a job) through /{service}/jobs/{id} until it ends; returns the job's result id. */
-  async function follow(service, job, resultField) {
-    const deadline = Date.now() + timeoutMs;
+  /**
+   * Follow a 202 answer (a job) through /{service}/jobs/{id} until it ends; returns the job's result id. onProgress
+   * gets each status (state, progress 0-1, stage, message); an aborted signal stops the wait, not the job.
+   */
+  async function follow(service, job, resultField, { onProgress, signal } = {}) {
+    const path = `/${service}/jobs/${job.job_id}`;
+    const deadline = now() + timeoutMs;
+    let wait = pollMs;
+    let errors = 0;
     for (;;) {
-      const { data } = await request('GET', `/${service}/jobs/${job.job_id}`);
-      if (data.state === 'succeeded') {
-        return data[resultField];
+      signal?.throwIfAborted();
+      let data;
+      try {
+        ({ data } = await request('GET', path));
+        errors = 0;
+      } catch (e) {
+        // a gateway restarting or a dropped connection: the job runs on, so ask again
+        if ((e instanceof RadiarchApiError && !TRANSIENT.has(e.status)) || ++errors > POLL_ERRORS) {
+          throw e;
+        }
       }
-      if (data.state === 'failed' || data.state === 'cancelled') {
-        throw new RadiarchApiError(500, data.message ?? data.state, 'GET', `/${service}/jobs/${job.job_id}`);
+      if (data) {
+        onProgress?.(data);
+        if (data.state === 'succeeded') {
+          return data[resultField];
+        }
+        if (data.state === 'failed' || data.state === 'cancelled') {
+          throw new RadiarchApiError(500, data.message ?? data.state, 'GET', path);
+        }
       }
-      if (Date.now() > deadline) {
-        throw new RadiarchApiError(504, 'timed out waiting for the job', 'GET', `/${service}/jobs/${job.job_id}`);
+      if (now() > deadline) {
+        throw new RadiarchApiError(504, 'stopped waiting for the job; it runs on, and once it ends asking again returns its result', 'GET', path);
       }
-      await sleep(pollMs);
+      await sleep(wait, signal);
+      wait = Math.min(pollMaxMs, wait * 1.5);
     }
   }
 
@@ -77,9 +112,9 @@ export function createClient({ apiUrl, headers = () => ({}), fetch: fetchImpl = 
 
     /**
      * Evaluate an export's dose against a goal template: DVHs, indices and the goals graded. A cached evaluation
-     * answers at once; otherwise the job is followed.
+     * answers at once; otherwise the job is followed (onProgress, signal: as for makeDeliverable).
      */
-    evaluateExport: async (exp, { templateId, dvhBins = 200 } = {}) => {
+    evaluateExport: async (exp, { templateId, dvhBins = 200, onProgress, signal } = {}) => {
       if (!exp?.dose_id) {
         throw new RadiarchApiError(422, 'this export has no dose radiarch can evaluate', 'POST', '/evaluate/run');
       }
@@ -100,7 +135,7 @@ export function createClient({ apiUrl, headers = () => ({}), fetch: fetchImpl = 
       if (status === 200) {
         return data;
       }
-      const evaluationId = await follow('evaluate', data, 'evaluation_id');
+      const evaluationId = await follow('evaluate', data, 'evaluation_id', { onProgress, signal });
       return (await request('GET', `/evaluate/${evaluationId}`)).data;
     },
 
@@ -138,13 +173,16 @@ export function createClient({ apiUrl, headers = () => ({}), fetch: fetchImpl = 
     /** The blend that best meets a goal set, priority by priority (AutoNavigateRequest). */
     autoNavigate: async (mcoId, body) => (await request('POST', `/mco/${mcoId}/auto-navigate`, { body })).data,
 
-    /** A state made deliverable (DeliverableRequest): a stored plan at once, else the job followed to its result. */
-    makeDeliverable: async (mcoId, body) => {
+    /**
+     * A state made deliverable (DeliverableRequest): a stored plan at once, else the job followed to its result, however
+     * long it takes. onProgress gets the job's status at each poll; an aborted signal stops the wait, not the job.
+     */
+    makeDeliverable: async (mcoId, body, { onProgress, signal } = {}) => {
       const { status, data } = await request('POST', `/mco/${mcoId}/deliverable`, { body });
       if (status === 200) {
         return data;
       }
-      const deliverableId = await follow('mco/deliverables', data, 'deliverable_id');
+      const deliverableId = await follow('mco/deliverables', data, 'deliverable_id', { onProgress, signal });
       return (await request('GET', `/mco/deliverables/${deliverableId}`)).data;
     },
 

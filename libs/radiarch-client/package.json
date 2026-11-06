@@ -9,6 +9,6 @@
   "exports": { ".": "./src/index.js" },
   "files": ["src/**"],
   "engines": { "node": ">=20" },
-  "scripts": { "test": "node --test test/client.test.js" },
+  "scripts": { "test": "node --test test/client.test.js test/mco.test.js test/jobs.test.js" },
   "keywords": ["radiotherapy", "radiarch", "ohif"]
 }
