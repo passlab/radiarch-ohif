@@ -32,6 +32,19 @@ function fakeApi(polls) {
     if (path === '/mco/deliverables/d1') {
       return json(200, { deliverable_id: 'd1' });
     }
+    if (method === 'POST' && path === '/mco/deliverables/d1/pareto') {
+      return json(202, { job_id: 'j2', state: 'queued' });
+    }
+    if (path === '/mco/jobs/j2') {
+      const p = polls[Math.min(i++, polls.length - 1)];
+      return json(200, p.state === 'succeeded' ? { state: 'succeeded', progress: 1, mco_id: 'm2' } : p);
+    }
+    if (path === '/mco/m2') {
+      return json(200, { mco_id: 'm2', source_deliverable_id: 'd1', elements: 'segments' });
+    }
+    if (path === '/mco/m2/states') {
+      return json(200, [{ state_id: 'balance' }]);
+    }
     return json(404, { detail: 'not found' });
   };
   return { fetch, seen, now: () => clock };
@@ -89,4 +102,15 @@ test('a host that sets a limit stops waiting after it; the message says the job 
   const api = fakeApi([running(1)]);
   const c = createClient({ apiUrl: API, fetch: api.fetch, now: api.now, pollMs: 1, pollMaxMs: 2, timeoutMs: 30 * 60 * 1000 });
   await assert.rejects(c.makeDeliverable('m1', { state_id: 's1' }), e => e.status === 504 && /runs on/.test(e.message));
+});
+
+test('a second set on a deliverable plan\'s apertures is followed through its job, with its states', async () => {
+  const api = fakeApi([running(3), done]);
+  const c = createClient({ apiUrl: API, fetch: api.fetch, now: api.now, pollMs: 1, pollMaxMs: 2 });
+  const seen = [];
+  const { set, states } = await c.apertureSet('d1', { plan_budget: 4 }, { onProgress: s => seen.push(s.state) });
+  assert.equal(set.source_deliverable_id, 'd1');
+  assert.deepEqual(states.map(s => s.state_id), ['balance']);
+  assert.deepEqual(seen, ['running', 'succeeded']);
+  assert.deepEqual(api.seen.filter(s => !s.includes('/jobs/')), ['POST /mco/deliverables/d1/pareto', 'GET /mco/m2', 'GET /mco/m2/states']);
 });

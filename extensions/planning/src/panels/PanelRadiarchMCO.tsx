@@ -6,6 +6,8 @@
 // table; "Export and open" writes it beside this plan and opens it in the viewer. Requests carry the host's
 // authorization header (ADR 0018). A deliverable arc plan takes hours: the panel follows its job to the end and shows
 // its progress, and stops following (the job runs on) when the panel closes or another dose comes on screen.
+// "Navigate again on its apertures" (R11.11) builds a second, small Pareto set over the deliverable plan's metersets and
+// switches the panel to it: every plan in it keeps those apertures, so the state navigated there is the plan delivered.
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useViewportGrid } from '@ohif/ui-next';
@@ -137,6 +139,22 @@ function PanelRadiarchMCO({ servicesManager }: withAppTypes) {
       }
     });
 
+  const navigateOnApertures = () =>
+    run("Making a second set on the plan's apertures…", async () => {
+      const wait = (waiting.current = new AbortController());
+      const onProgress = s =>
+        setBusy(`Making a second set on the plan's apertures… ${Math.round(100 * (s.progress ?? 0))} %${s.stage ? ` (${s.stage})` : ''}.`);
+      const second = await client.apertureSet(plan.deliverable_id, {}, { onProgress, signal: wait.signal });
+      if (!wait.signal.aborted) {
+        setFound({ set: second.set, states: second.states, plan });
+        setState(second.states[0] ?? null);
+        setDraft({});
+        setLocks([]);
+        setPlan(null);
+        setExported(null);
+      }
+    });
+
   const exportAndOpen = () =>
     run('Exporting…', async () => {
       const rs = (exp.objects ?? []).find(o => o.kind === 'RTSTRUCT');
@@ -174,9 +192,11 @@ function PanelRadiarchMCO({ servicesManager }: withAppTypes) {
     <div className="flex w-full min-w-0 flex-col gap-2 overflow-x-hidden break-words p-2 text-sm text-white">
       <div className="text-xs text-yellow-300">{INTENDED_USE}</div>
       <div>
-        <div className="font-semibold">Pareto set</div>
+        <div className="font-semibold" data-cy="radiarch-mco-set">
+          {set.source_deliverable_id ? 'Second set, on the deliverable plan\'s apertures' : 'Pareto set'}
+        </div>
         <div className="text-xs text-gray-300">
-          {set.plans.length} plans, error bound {fmt(set.error_bound, 3)}
+          {set.plans.length} plans{set.elements ? ` on its ${set.elements}` : ''}, error bound {fmt(set.error_bound, 3)}
           {robust ? `; robust over ${set.scenarios.length} scenarios (worst case, nominal in brackets)` : ''}
         </div>
         <div className="text-xs text-gray-300" data-cy="radiarch-mco-state">
@@ -304,9 +324,16 @@ function PanelRadiarchMCO({ servicesManager }: withAppTypes) {
               ))}
             </tbody>
           </table>
-          <button className="mt-1 rounded bg-blue-700 px-2 py-0.5 disabled:opacity-50" disabled={!!busy || !plan.dose_id} onClick={exportAndOpen}>
-            Export and open
-          </button>
+          <div className="mt-1 flex flex-wrap gap-2">
+            <button className="rounded bg-blue-700 px-2 py-0.5 disabled:opacity-50" disabled={!!busy || !plan.dose_id} onClick={exportAndOpen}>
+              Export and open
+            </button>
+            {plan.technique !== 'proton' && !set.source_deliverable_id && (
+              <button className="rounded bg-blue-700 px-2 py-0.5 disabled:opacity-50" disabled={!!busy} onClick={navigateOnApertures}>
+                Navigate again on its apertures
+              </button>
+            )}
+          </div>
         </div>
       )}
       {exported && (

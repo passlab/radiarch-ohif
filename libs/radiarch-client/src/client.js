@@ -186,6 +186,18 @@ export function createClient({ apiUrl, headers = () => ({}), fetch: fetchImpl = 
       return (await request('GET', `/mco/deliverables/${deliverableId}`)).data;
     },
 
+    /**
+     * A second Pareto set on a deliverable plan's apertures (R11.11, ApertureSetRequest), with its states: every plan in
+     * it keeps the plan's apertures and differs only in its metersets, so a state navigated on it is deliverable as
+     * shown, and makeDeliverable on it makes that plan. The stored set at once, else its job followed (onProgress,
+     * signal: as for makeDeliverable).
+     */
+    apertureSet: async (deliverableId, body = {}, { onProgress, signal } = {}) => {
+      const { status, data } = await request('POST', `/mco/deliverables/${deliverableId}/pareto`, { body });
+      const set = status === 200 ? data : (await request('GET', `/mco/${await follow('mco', data, 'mco_id', { onProgress, signal })}`)).data;
+      return { set, states: (await request('GET', `/mco/${set.mco_id}/states`)).data };
+    },
+
     /** Write (and, with push, send to the DICOMweb server) the RT objects of a plan (RTExportRequest). */
     exportPlan: async body => (await request('POST', '/rt/export', { body })).data,
   };

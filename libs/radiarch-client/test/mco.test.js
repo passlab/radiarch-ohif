@@ -1,4 +1,5 @@
-// Tests of @radiarch/client's multi-criteria calls (R11.7). tests/test_r11_viewer_client.py starts a radiarch API
+// Tests of @radiarch/client's multi-criteria calls (R11.7; the second set on a plan's apertures, R11.11).
+// tests/test_r11_viewer_client.py starts a radiarch API
 // (API key required), computes a Pareto set, makes and exports a deliverable plan, and runs this file with
 // RADIARCH_TEST_API, RADIARCH_TEST_API_KEY and RADIARCH_TEST_MCO_CASE (a JSON file of what it made); the results go to
 // RADIARCH_TEST_OUT for it to check. Without a server only the offline tests run.
@@ -66,6 +67,17 @@ test('a slider move, a lock, automatic navigation, and the moved state made deli
   assert.ok(exp.export_id && exp.objects.some(o => o.kind === 'RTDOSE'));
   out.deliverable = plan;
   out.export_id = exp.export_id;
+
+  // R11.11: a second set on the plan's apertures; a state on it made the plan keeps them
+  const second = await c.apertureSet(plan.deliverable_id, { plan_budget: 4 });
+  assert.equal(second.set.source_deliverable_id, plan.deliverable_id);
+  assert.equal(second.set.elements, 'segments');
+  assert.equal(second.states[0].state_id, 'balance');
+  assert.equal((await c.apertureSet(plan.deliverable_id, { plan_budget: 4 })).set.mco_id, second.set.mco_id);
+  const onApertures = await c.makeDeliverable(second.set.mco_id, { state_id: 'balance' });
+  assert.equal(onApertures.mco_id, second.set.mco_id);
+  assert.equal(onApertures.sequence_id, plan.sequence_id);
+  out.second = { mco_id: second.set.mco_id, deliverable_id: onApertures.deliverable_id };
 });
 
 test('trade-off rows: worst case and nominal on a robust set, null without a state', () => {
