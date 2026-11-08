@@ -34,6 +34,26 @@ window.config = { /* ... */ radiarch: { apiUrl: '/radiarch/api/v1', defaultTempl
 Requests carry OHIF's authorization header (`userAuthenticationService`). Radiarch's API key never
 reaches the browser: the proxy, or a host's gateway, authenticates the user and adds the key.
 
+A host whose archive authorizes each upload by user and study gives a function that issues an upload token
+(radiarch's ADR 0020):
+
+```js
+radiarch: {
+  apiUrl: '/radiarch/api/v1',
+  getUploadToken: async ({ studyInstanceUID, objects }) => /* the host's token, e.g. 'Bearer eyJ…', or null */ null,
+  uploadTokenHeader: 'X-Upload-Authorization',       // the default; radiarch's RADIARCH_UPLOAD_TOKEN_HEADER
+}
+```
+
+The MCO panel calls it when the user chooses "Export and open". `objects` lists the object kinds the export writes
+(`rtplan`, `rtdose`, …); their UIDs do not exist yet. Then:
+- a token: radiarch sends it to the archive as the push's `Authorization`, and keeps no trace of it;
+- `null`: the plan is written but not sent, and the panel says "not sent: the host gave no upload token";
+- an error: the panel shows it, and nothing is exported.
+
+Without the function, the export is pushed with radiarch's own credential, as before. The client's `exportPlan` and
+`pushExport` take `{ uploadToken }` for a host that calls them itself.
+
 ## Using the extensions in an OHIF build
 
 1. Put both packages in OHIF's workspace (`extensions/`).
@@ -89,7 +109,9 @@ breaks the CI build or, from R13.2d, the browser test.
 ## Tests
 
 This repository's CI runs the tests that need no server (`node --test` on `libs/rt-dose-core/test/core.test.js`,
-`libs/radiarch-client/test/*.test.js` and `scripts/test/build-ohif.test.mjs`) and builds the standalone image. Radiarch's
+`libs/radiarch-client/test/*.test.js` and `scripts/test/build-ohif.test.mjs`) and builds the standalone image. Among
+them, `libs/radiarch-client/test/upload.test.js` checks the upload token: the header goes only with a token, the hook
+gets the study and the objects, a `null` writes without sending, and an error exports nothing. Radiarch's
 CI checks this repository out at the commit radiarch pins (`viewer.ref` in radiarch) into its `viewer/` directory and
 runs the tests that need radiarch's objects or its API, and the browser test of the standalone image:
 

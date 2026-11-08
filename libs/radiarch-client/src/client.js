@@ -18,28 +18,37 @@ const sleep = (ms, signal) =>
     signal?.addEventListener('abort', () => (clearTimeout(t), reject(signal.reason)), { once: true });
   });
 
+// The objects an export writes when the request names none (radiarch's RTExportRequest.objects).
+const OBJECT_KINDS = ['rtstruct', 'rtplan', 'rtdose', 'rtimage'];
+
 // While a job is followed, a gateway or network error is retried this many times in a row before the wait fails.
 const POLL_ERRORS = 5;
 const TRANSIENT = new Set([502, 503, 504]);
 
 /**
  * @param {{apiUrl: string, headers?: () => (object | Promise<object>), fetch?: typeof fetch, pollMs?: number,
- *   pollMaxMs?: number, timeoutMs?: number, now?: () => number}} options
+ *   pollMaxMs?: number, timeoutMs?: number, now?: () => number, uploadTokenHeader?: string}} options
  *   apiUrl: radiarch's API base, e.g. "/radiarch/api/v1"; headers: called per request (a host's authorization header).
+ *   uploadTokenHeader: the header a push's upload token goes in (radiarch's RADIARCH_UPLOAD_TOKEN_HEADER; ADR 0020).
  *   A job is followed until it ends (a deliverable arc plan takes hours): polls start every pollMs and slow to
  *   pollMaxMs; timeoutMs, when given, stops the wait (not the job) after that long.
  */
 export function createClient({ apiUrl, headers = () => ({}), fetch: fetchImpl = globalThis.fetch, pollMs = 500, pollMaxMs = 5000,
-                               timeoutMs = Infinity, now = () => Date.now() }) {
+                               timeoutMs = Infinity, now = () => Date.now(), uploadTokenHeader = 'X-Upload-Authorization' }) {
   const base = String(apiUrl).replace(/\/+$/, '');
 
-  async function request(method, path, { query, body, expect = [200, 201, 202] } = {}) {
+  async function request(method, path, { query, body, expect = [200, 201, 202], uploadToken } = {}) {
     const qs = query
       ? '?' + new URLSearchParams(Object.entries(query).filter(([, v]) => v !== undefined && v !== null)).toString()
       : '';
     const resp = await fetchImpl(`${base}${path}${qs}`, {
       method,
-      headers: { Accept: 'application/json', ...(body ? { 'Content-Type': 'application/json' } : {}), ...(await headers()) },
+      headers: {
+        Accept: 'application/json',
+        ...(body ? { 'Content-Type': 'application/json' } : {}),
+        ...(await headers()),
+        ...(uploadToken ? { [uploadTokenHeader]: uploadToken } : {}),
+      },
       body: body ? JSON.stringify(body) : undefined,
     });
     const text = await resp.text();
@@ -198,7 +207,37 @@ export function createClient({ apiUrl, headers = () => ({}), fetch: fetchImpl = 
       return { set, states: (await request('GET', `/mco/${set.mco_id}/states`)).data };
     },
 
-    /** Write (and, with push, send to the DICOMweb server) the RT objects of a plan (RTExportRequest). */
-    exportPlan: async body => (await request('POST', '/rt/export', { body })).data,
+    /**
+     * Write (and, with push, send to the DICOMweb server) the RT objects of a plan (RTExportRequest). uploadToken, when
+     * given, is the push's credential at the archive (ADR 0020); radiarch passes it on and keeps no trace of it.
+     */
+    exportPlan: async (body, { uploadToken } = {}) => (await request('POST', '/rt/export', { body, uploadToken })).data,
+
+    /** Send an export's objects to the DICOMweb server (RTPushRequest), with the host's upload token when given. */
+    pushExport: async (exportId, body = {}, { uploadToken } = {}) =>
+      (await request('POST', `/rt/exports/${exportId}/push`, { body, uploadToken })).data,
+
+    /**
+     * Export a plan and send it, asking the host for an upload token first when it gives a hook (ADR 0020):
+     * getUploadToken({ studyInstanceUID, objects }) gets the study and the object kinds the export writes. A token goes
+     * with the push; null writes the objects without sending them, and the result's notSent says why; an error is
+     * thrown before anything is exported. Without a hook the export is pushed as before.
+     */
+    exportAndPush: async (body, { getUploadToken, studyInstanceUID } = {}) => {
+      if (!getUploadToken) {
+        return (await request('POST', '/rt/export', { body: { ...body, push: true } })).data;
+      }
+      let uploadToken;
+      try {
+        uploadToken = await getUploadToken({ studyInstanceUID, objects: [...(body.objects ?? OBJECT_KINDS)] });
+      } catch (e) {
+        throw new Error(`no upload token from the host: ${e?.message ?? e}`, { cause: e });
+      }
+      if (!uploadToken) {
+        const written = (await request('POST', '/rt/export', { body: { ...body, push: false } })).data;
+        return { ...written, notSent: 'the host gave no upload token' };
+      }
+      return (await request('POST', '/rt/export', { body: { ...body, push: true }, uploadToken })).data;
+    },
   };
 }

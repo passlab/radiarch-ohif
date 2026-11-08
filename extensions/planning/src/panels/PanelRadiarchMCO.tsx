@@ -8,6 +8,8 @@
 // its progress, and stops following (the job runs on) when the panel closes or another dose comes on screen.
 // "Navigate again on its apertures" (R11.11) builds a second, small Pareto set over the deliverable plan's metersets and
 // switches the panel to it: every plan in it keeps those apertures, so the state navigated there is the plan delivered.
+// A host whose archive authorizes each upload gives getUploadToken (radiarch's ADR 0020): "Export and open" asks it
+// first; its token goes with the push, a null writes the plan without sending it, and an error exports nothing.
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useViewportGrid } from '@ohif/ui-next';
@@ -39,7 +41,12 @@ function PanelRadiarchMCO({ servicesManager }: withAppTypes) {
   const stopWaiting = () => waiting.current?.abort();
 
   const client = useMemo(
-    () => createClient({ apiUrl: getConfig().apiUrl, headers: () => userAuthenticationService?.getAuthorizationHeader?.() ?? {} }),
+    () =>
+      createClient({
+        apiUrl: getConfig().apiUrl,
+        headers: () => userAuthenticationService?.getAuthorizationHeader?.() ?? {},
+        ...(getConfig().uploadTokenHeader ? { uploadTokenHeader: getConfig().uploadTokenHeader } : {}),
+      }),
     [userAuthenticationService]
   );
 
@@ -159,14 +166,16 @@ function PanelRadiarchMCO({ servicesManager }: withAppTypes) {
     run('Exporting…', async () => {
       const rs = (exp.objects ?? []).find(o => o.kind === 'RTSTRUCT');
       setExported(
-        await client.exportPlan({
-          beam_model_id: plan.beam_model_id,
-          dose_id: plan.dose_id,
-          label: 'MCO',
-          prescription: rx,
-          push: true,
-          ...(rs ? { rtstruct_uid: rs.sop_instance_uid, objects: ['rtplan', 'rtdose'] } : {}),
-        })
+        await client.exportAndPush(
+          {
+            beam_model_id: plan.beam_model_id,
+            dose_id: plan.dose_id,
+            label: 'MCO',
+            prescription: rx,
+            ...(rs ? { rtstruct_uid: rs.sop_instance_uid, objects: ['rtplan', 'rtdose'] } : {}),
+          },
+          { getUploadToken: getConfig().getUploadToken, studyInstanceUID: exp.study_instance_uid }
+        )
       );
     });
 
@@ -347,7 +356,7 @@ function PanelRadiarchMCO({ servicesManager }: withAppTypes) {
               'Sent to the image server: reopen the study to see it.'
             )
           ) : (
-            `Exported (${exported.export_id}); not sent: ${exported.push_error ?? 'no image server configured'}`
+            `Exported (${exported.export_id}); not sent: ${exported.notSent ?? exported.push_error ?? 'no image server configured'}`
           )}
         </div>
       )}
